@@ -1,0 +1,61 @@
+<script setup lang="ts">
+import { useRoute } from 'vue-router'
+
+defineProps<{
+  isCollapsed: boolean
+}>()
+
+const route = useRoute()
+
+const navItems = [
+  {
+    name: 'Estudio Creativo',
+    path: '/',
+    icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'
+  },
+  {
+    name: 'Motores & Formatos',
+    path: '/services',
+    icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
+  },
+  {
+    name: 'Soporte & API',
+    path: '/contact',
+    icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+  }
+]
+</script>
+
+<template>
+  <aside 
+    :class="[
+      'fixed left-0 top-14 bottom-0 bg-[#0f0f0f] border-r border-[#272727] transition-all duration-200 z-30 flex flex-col justify-between',
+      isCollapsed ? 'w-16' : 'w-60'
+    ]"
+  >
+    <div class="py-3 space-y-1">
+      <RouterLink 
+        v-for="item in navItems" 
+        :key="item.path"
+        :to="item.path"
+        class="flex items-center gap-4 px-4 py-3 mx-2 rounded-xl text-sm font-medium transition-colors"
+        :class="route.path === item.path ? 'bg-[#272727] text-white' : 'text-neutral-400 hover:bg-[#1a1a1a] hover:text-white'"
+      >
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
+        </svg>
+        <span v-if="!isCollapsed" class="truncate">{{ item.name }}</span>
+      </RouterLink>
+    </div>
+
+    <!-- Mini stats footer sidebar -->
+    <div v-if="!isCollapsed" class="p-4 m-2 bg-[#181818] rounded-xl border border-[#272727] text-xs">
+      <p class="font-semibold text-neutral-300">Omni Pipeline v2.4</p>
+      <p class="text-neutral-500 mt-1">5 variantes configuradas</p>
+      <div class="mt-2.5 flex items-center gap-1.5 text-emerald-400">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>Motor Activo</span>
+      </div>
+    </div>
+  </aside>
+</template>

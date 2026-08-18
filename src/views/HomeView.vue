@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+const props = withDefaults(
+  defineProps<{
+    searchQuery?: string
+    isDark?: boolean
+  }>(),
+  {
+    searchQuery: '',
+    isDark: true
+  }
+)
 
 export type ContentFormat = 'Hilos' | 'Artículos' | 'Boletines' | 'Videos' | 'Audios'
 
@@ -32,7 +43,7 @@ const variants = ref<VariantItem[]>([
   {
     id: '2',
     format: 'Artículos',
-    title: 'La Guía Definitiva: Cómo Escalar tu Distribución Omnicanal con IA en 2026',
+    title: 'La Guía Definitiva: Cómo Escalar tu Distribución Omnicanal con IA',
     content: 'La fatiga de creación es el mayor cuello de botella para marcas y agencias. Implementar un pipeline asistido permite reducir el tiempo de redacción de 6 horas a 20 minutos, priorizando el criterio editorial y la curaduría sobre el bloqueo de la página en blanco.',
     isApproved: true,
     isEditing: false,
@@ -73,71 +84,85 @@ const variants = ref<VariantItem[]>([
 
 const filterOptions: (ContentFormat | 'Todos')[] = ['Todos', 'Hilos', 'Artículos', 'Boletines', 'Videos', 'Audios']
 
-const filteredVariants = computed(() => {
-  if (selectedFilter.value === 'Todos') return variants.value
-  return variants.value.filter(v => v.format === selectedFilter.value)
-})
-
 const generateVariants = () => {
   if (!inputPrompt.value.trim()) return
   isGenerating.value = true
   
   setTimeout(() => {
+    const raw = inputPrompt.value.trim()
+    const summary = raw.length > 50 ? raw.slice(0, 50) + '...' : raw
+
     variants.value = [
       {
-        id: '1',
+        id: Date.now().toString() + '-1',
         format: 'Hilos',
-        title: `🧵 Hilo Estratégico: ${inputPrompt.value.slice(0, 45)}...`,
-        content: `1/5 Analicemos a fondo: "${inputPrompt.value}"\n\n2/5 Paso fundamental: Define el público objetivo antes de redactar.\n\n3/5 Conclusión clave: La velocidad de iteración supera a la perfección inicial.`,
+        title: `🧵 Hilo Estratégico: ${summary}`,
+        content: `1/6 Analicemos la tesis: "${raw}"\n\n2/6 Primer paso crítico: Define tu ángulo y audiencia objetivo antes de distribuir.\n\n3/6 Conclusión: La consistencia omnicanal multiplica por 4 el alcance orgánico.`,
         isApproved: false,
         isEditing: false,
-        durationOrLength: '5 Tweets',
+        durationOrLength: '6 Tweets',
         tag: 'X / Twitter'
       },
       {
-        id: '2',
+        id: Date.now().toString() + '-2',
         format: 'Artículos',
-        title: `Análisis Editorial: Impacto de "${inputPrompt.value.slice(0, 40)}"`,
-        content: `En este ensayo profundizamos en las implicaciones prácticas de "${inputPrompt.value}". La clave radica en una ejecución ágil y en mantener una voz consistente a través de todos los canales.`,
+        title: `Análisis Editorial: Impacto Práctico de "${summary}"`,
+        content: `En este artículo desglosamos las implicaciones de "${raw}". La clave no radica únicamente en producir más, sino en estructurar ideas modulares que resuenen en múltiples plataformas de forma nativa.`,
         isApproved: false,
         isEditing: false,
-        durationOrLength: '850 palabras',
+        durationOrLength: '950 palabras',
         tag: 'Blog / Medium'
       },
       {
-        id: '3',
+        id: Date.now().toString() + '-3',
         format: 'Boletines',
-        title: `Newsletter Exclusivo: Claves sobre ${inputPrompt.value.slice(0, 35)}`,
-        content: `Estimada comunidad,\n\nHoy desglosamos las lecciones aprendidas sobre "${inputPrompt.value}". No te pierdas los pasos accionables que preparamos para ti.`,
+        title: `Newsletter VIP: Claves y Lecciones sobre ${summary}`,
+        content: `Hola suscriptor,\n\nHoy desglosamos: "${raw}".\n\nAquí tienes 3 aprendizajes accionables para aplicar en tu workflow creativo desde hoy.`,
         isApproved: false,
         isEditing: false,
         durationOrLength: 'Lectura de 2 min',
         tag: 'Substack'
       },
       {
-        id: '4',
+        id: Date.now().toString() + '-4',
         format: 'Videos',
-        title: `Guión Audiovisual: ${inputPrompt.value.slice(0, 38)}`,
-        content: `[00:00 - GANCHO DIRECTO] "¿Sabías esto sobre ${inputPrompt.value.slice(0, 25)}?"\n[00:10 - DESARROLLO RÁPIDO] 3 Puntos clave que debes ejecutar ya.\n[00:40 - CIERRE Y CTA] Dale like y suscríbete para más.`,
+        title: `Guión Audiovisual: ${summary}`,
+        content: `[00:00 - GANCHO DIRECTO] "¿Sabías esto sobre ${summary}?"\n[00:10 - DESARROLLO] 3 Pasos rápidos que debes ejecutar.\n[00:40 - CIERRE Y CTA] Dale like y suscríbete para más tácticas.`,
         isApproved: false,
         isEditing: false,
         durationOrLength: '0:50 min',
-        tag: 'Shorts / Reels'
+        tag: 'YouTube Shorts'
       },
       {
-        id: '5',
+        id: Date.now().toString() + '-5',
         format: 'Audios',
-        title: `Pauta Micro-Podcast: ${inputPrompt.value.slice(0, 35)}`,
-        content: `[Voz en off serena]\n"Hola a todos. Hoy reflexionamos brevemente sobre ${inputPrompt.value} y su impacto en la productividad moderna..."`,
+        title: `Pauta Micro-Podcast: ${summary}`,
+        content: `[Voz en off serena]\n"Bienvenidos al micro-episodio de hoy. Reflexionamos sobre ${raw} y cómo optimizar la toma de decisiones creativas..."`,
         isApproved: false,
         isEditing: false,
-        durationOrLength: '4:15 min',
+        durationOrLength: '4:30 min',
         tag: 'Audiograma'
       }
     ]
     isGenerating.value = false
   }, 600)
 }
+
+const filteredVariants = computed(() => {
+  return variants.value.filter(v => {
+    const matchesFormat = selectedFilter.value === 'Todos' || v.format === selectedFilter.value
+    const query = props.searchQuery ? props.searchQuery.toLowerCase().trim() : ''
+    if (!query) return matchesFormat
+
+    return (
+      matchesFormat &&
+      (v.title.toLowerCase().includes(query) ||
+        v.content.toLowerCase().includes(query) ||
+        v.tag.toLowerCase().includes(query) ||
+        v.format.toLowerCase().includes(query))
+    )
+  })
+})
 
 const toggleApproval = (variant: VariantItem) => {
   variant.isApproved = !variant.isApproved
@@ -146,47 +171,66 @@ const toggleApproval = (variant: VariantItem) => {
 const toggleEdit = (variant: VariantItem) => {
   variant.isEditing = !variant.isEditing
 }
+
+onMounted(() => {
+  window.addEventListener('omni-trigger-generate', generateVariants)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('omni-trigger-generate', generateVariants)
+})
 </script>
 
 <template>
   <div class="p-6 max-w-7xl mx-auto space-y-6">
-    <!-- Hero / Studio Generator Input Box -->
-    <section class="bg-[#181818] border border-[#272727] rounded-2xl p-6 shadow-xl relative overflow-hidden">
+    <!-- Generator Box -->
+    <section 
+      :class="[
+        isDark ? 'bg-[#181818] border-[#272727]' : 'bg-white border-neutral-200 shadow-sm',
+        'border rounded-2xl p-6 relative overflow-hidden transition-colors'
+      ]"
+    >
       <div class="absolute -right-10 -top-10 w-48 h-48 bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
         <div>
-          <h1 class="text-xl font-bold text-white flex items-center gap-2">
+          <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-xl font-bold flex items-center gap-2">
             <span class="w-3 h-3 bg-[#ff0000] rounded-sm"></span>
             Central de Inteligencia de Contenido
           </h1>
-          <p class="text-xs text-neutral-400 mt-1">
+          <p :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-xs mt-1">
             Ingresa tu premisa y genera instantáneamente variantes para 5 canales optimizados.
           </p>
         </div>
-        <span class="text-xs px-3 py-1 bg-[#272727] text-neutral-300 rounded-full w-fit">
+        <span 
+          :class="isDark ? 'bg-[#272727] text-neutral-300' : 'bg-neutral-100 text-neutral-700'"
+          class="text-xs px-3 py-1 rounded-full w-fit font-medium"
+        >
           5 Canales Sincronizados
         </span>
       </div>
 
       <div class="space-y-4">
-        <div class="relative">
-          <textarea
-            v-model="inputPrompt"
-            rows="3"
-            placeholder="Escribe aquí tu tesis, noticia, lanzamiento o premisa creativa..."
-            class="w-full bg-[#0f0f0f] border border-[#303030] focus:border-[#ff0000] rounded-xl p-4 text-sm text-white placeholder-neutral-500 focus:outline-none transition-all resize-none shadow-inner"
-          ></textarea>
-        </div>
+        <textarea
+          v-model="inputPrompt"
+          rows="3"
+          placeholder="Escribe aquí tu tesis, noticia, lanzamiento o premisa creativa..."
+          :class="[
+            isDark 
+              ? 'bg-[#0f0f0f] border-[#303030] text-white placeholder-neutral-500' 
+              : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400',
+            'w-full border focus:border-[#ff0000] rounded-xl p-4 text-sm focus:outline-none transition-all resize-none shadow-inner'
+          ]"
+        ></textarea>
 
         <div class="flex items-center justify-between flex-wrap gap-3">
-          <div class="text-xs text-neutral-500">
-            Presiona <strong class="text-neutral-300">Generar Variantes</strong> para poblar Hilos, Artículos, Boletines, Videos y Audios.
+          <div :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-xs">
+            Filtra en tiempo real o presiona <strong :class="isDark ? 'text-white' : 'text-neutral-900'">Generar Variantes</strong>.
           </div>
           <button
             @click="generateVariants"
             :disabled="isGenerating"
-            class="bg-[#ff0000] hover:bg-[#cc0000] disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-semibold text-sm px-6 py-2.5 rounded-full flex items-center gap-2 shadow-lg shadow-red-900/40 transition-all cursor-pointer"
+            class="bg-[#ff0000] hover:bg-[#cc0000] disabled:bg-neutral-400 text-white font-semibold text-sm px-6 py-2.5 rounded-full flex items-center gap-2 shadow-lg shadow-red-900/30 transition-all cursor-pointer"
           >
             <svg v-if="isGenerating" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -201,112 +245,135 @@ const toggleEdit = (variant: VariantItem) => {
       </div>
     </section>
 
-    <!-- Filters Row (YouTube-style Pills) -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+    <!-- Filter Pills -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-2">
       <button
         v-for="filter in filterOptions"
         :key="filter"
         @click="selectedFilter = filter"
-        class="px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all border"
+        class="px-4 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all border cursor-pointer"
         :class="[
           selectedFilter === filter
-            ? 'bg-white text-black border-white'
-            : 'bg-[#272727] text-neutral-300 border-transparent hover:bg-[#3f3f3f]'
+            ? (isDark ? 'bg-white text-black border-white' : 'bg-neutral-900 text-white border-neutral-900')
+            : (isDark ? 'bg-[#272727] text-neutral-300 border-transparent hover:bg-[#3f3f3f]' : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-100')
         ]"
       >
         {{ filter }}
       </button>
+
+      <span v-if="searchQuery" class="text-xs text-neutral-500 ml-auto">
+        Buscando: <strong class="text-[#ff0000]">"{{ searchQuery }}"</strong>
+      </span>
     </div>
 
-    <!-- Output Grid of Formats -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+    <!-- Output Grid -->
+    <div v-if="filteredVariants.length > 0" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <article
         v-for="variant in filteredVariants"
         :key="variant.id"
-        class="bg-[#181818] border border-[#272727] rounded-xl overflow-hidden flex flex-col justify-between transition-all hover:border-[#383838]"
-        :class="{ 'ring-1 ring-emerald-500/50 bg-[#141b17]/40': variant.isApproved }"
+        :class="[
+          isDark ? 'bg-[#181818] border-[#272727]' : 'bg-white border-neutral-200 shadow-sm',
+          variant.isApproved ? (isDark ? 'ring-1 ring-emerald-500/50 bg-[#141b17]' : 'ring-1 ring-emerald-500 bg-emerald-50/40') : '',
+          'border rounded-xl overflow-hidden flex flex-col justify-between transition-all'
+        ]"
       >
-        <!-- Card Top Bar -->
-        <div class="p-4 border-b border-[#272727] flex items-center justify-between bg-[#121212]">
+        <!-- Card Header -->
+        <div 
+          :class="isDark ? 'bg-[#121212] border-[#272727]' : 'bg-neutral-50 border-neutral-200'"
+          class="p-4 border-b flex items-center justify-between"
+        >
           <div class="flex items-center gap-2">
             <span 
               class="text-xs font-bold px-2.5 py-1 rounded-md"
               :class="{
-                'bg-sky-950 text-sky-400 border border-sky-800': variant.format === 'Hilos',
-                'bg-amber-950 text-amber-400 border border-amber-800': variant.format === 'Artículos',
-                'bg-purple-950 text-purple-400 border border-purple-800': variant.format === 'Boletines',
-                'bg-red-950 text-red-400 border border-red-800': variant.format === 'Videos',
-                'bg-emerald-950 text-emerald-400 border border-emerald-800': variant.format === 'Audios',
+                'bg-sky-500/10 text-sky-500 border border-sky-500/30': variant.format === 'Hilos',
+                'bg-amber-500/10 text-amber-500 border border-amber-500/30': variant.format === 'Artículos',
+                'bg-purple-500/10 text-purple-500 border border-purple-500/30': variant.format === 'Boletines',
+                'bg-red-500/10 text-red-500 border border-red-500/30': variant.format === 'Videos',
+                'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30': variant.format === 'Audios',
               }"
             >
               {{ variant.format }}
             </span>
-            <span class="text-xs text-neutral-400 font-mono">{{ variant.durationOrLength }}</span>
+            <span class="text-xs text-neutral-500 font-mono">{{ variant.durationOrLength }}</span>
           </div>
 
           <div class="flex items-center gap-2">
             <span 
               v-if="variant.isApproved" 
-              class="text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800 flex items-center gap-1"
+              class="text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1"
             >
-              <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-              Aprobado
+              ✓ Aprobado
             </span>
-            <span class="text-xs text-neutral-500 bg-[#1c1c1c] px-2 py-0.5 rounded">{{ variant.tag }}</span>
+            <span 
+              :class="isDark ? 'bg-[#1c1c1c] text-neutral-400' : 'bg-neutral-200 text-neutral-700'"
+              class="text-xs px-2 py-0.5 rounded"
+            >
+              {{ variant.tag }}
+            </span>
           </div>
         </div>
 
-        <!-- Card Content / Editor Body -->
+        <!-- Card Body -->
         <div class="p-5 flex-1 space-y-3">
           <div v-if="!variant.isEditing">
-            <h2 class="text-sm font-bold text-white mb-2 leading-snug">{{ variant.title }}</h2>
-            <p class="text-xs text-neutral-300 whitespace-pre-line leading-relaxed">{{ variant.content }}</p>
+            <h2 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-sm font-bold mb-2 leading-snug">{{ variant.title }}</h2>
+            <p :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="text-xs whitespace-pre-line leading-relaxed">{{ variant.content }}</p>
           </div>
 
           <div v-else class="space-y-2">
-            <label class="text-[11px] text-neutral-400">Título / Asunto</label>
+            <label class="text-[11px] text-neutral-500">Título / Asunto</label>
             <input 
               v-model="variant.title" 
-              class="w-full bg-[#0f0f0f] border border-[#3f3f3f] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#ff0000]"
+              :class="isDark ? 'bg-[#0f0f0f] border-[#3f3f3f] text-white' : 'bg-neutral-50 border-neutral-300 text-neutral-900'"
+              class="w-full border rounded px-3 py-1.5 text-xs focus:outline-none focus:border-[#ff0000]"
             />
-            <label class="text-[11px] text-neutral-400">Cuerpo del Contenido</label>
+            <label class="text-[11px] text-neutral-500">Cuerpo del Contenido</label>
             <textarea
               v-model="variant.content"
               rows="6"
-              class="w-full bg-[#0f0f0f] border border-[#3f3f3f] rounded p-3 text-xs text-neutral-200 focus:outline-none focus:border-[#ff0000] resize-none font-mono"
+              :class="isDark ? 'bg-[#0f0f0f] border-[#3f3f3f] text-neutral-200' : 'bg-neutral-50 border-neutral-300 text-neutral-800'"
+              class="w-full border rounded p-3 text-xs focus:outline-none focus:border-[#ff0000] resize-none font-mono"
             ></textarea>
           </div>
         </div>
 
-        <!-- Card Action Footer -->
-        <div class="p-3 bg-[#121212] border-t border-[#272727] flex items-center justify-between gap-2">
+        <!-- Card Footer -->
+        <div 
+          :class="isDark ? 'bg-[#121212] border-[#272727]' : 'bg-neutral-50 border-neutral-200'"
+          class="p-3 border-t flex items-center justify-between gap-2"
+        >
           <button
             @click="toggleEdit(variant)"
-            class="text-xs px-3 py-1.5 rounded-lg border border-[#303030] hover:bg-[#272727] text-neutral-300 transition-colors flex items-center gap-1.5"
+            :class="isDark ? 'border-[#303030] hover:bg-[#272727] text-neutral-300' : 'border-neutral-300 hover:bg-neutral-200 text-neutral-700'"
+            class="text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-            <span>{{ variant.isEditing ? 'Guardar Cambios' : 'Editar' }}</span>
+            {{ variant.isEditing ? 'Guardar Cambios' : 'Editar' }}
           </button>
 
-          <div class="flex items-center gap-2">
-            <button
-              @click="toggleApproval(variant)"
-              class="text-xs px-4 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5"
-              :class="[
-                variant.isApproved
-                  ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                  : 'bg-[#272727] hover:bg-[#383838] text-white'
-              ]"
-            >
-              <span>{{ variant.isApproved ? 'Desaprobar' : 'Aprobar para Publicar' }}</span>
-            </button>
-          </div>
+          <button
+            @click="toggleApproval(variant)"
+            class="text-xs px-4 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
+            :class="[
+              variant.isApproved
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : (isDark ? 'bg-[#272727] hover:bg-[#383838] text-white' : 'bg-neutral-800 hover:bg-neutral-900 text-white')
+            ]"
+          >
+            {{ variant.isApproved ? 'Desaprobar' : 'Aprobar para Publicar' }}
+          </button>
         </div>
       </article>
+    </div>
+
+    <!-- Empty State -->
+    <div 
+      v-else 
+      :class="isDark ? 'bg-[#181818] border-[#272727]' : 'bg-white border-neutral-200'"
+      class="text-center py-16 border rounded-xl"
+    >
+      <p :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="text-sm font-semibold">No se encontraron variantes coincidentes</p>
+      <p class="text-xs text-neutral-500 mt-1">Intenta con otra palabra clave o selecciona la categoría "Todos".</p>
     </div>
   </div>
 </template>

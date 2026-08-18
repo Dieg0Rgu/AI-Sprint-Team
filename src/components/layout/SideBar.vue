@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router'
 
 defineProps<{
   isCollapsed: boolean
+  isDark: boolean
 }>()
 
 const route = useRoute()
@@ -29,8 +30,9 @@ const navItems = [
 <template>
   <aside 
     :class="[
-      'fixed left-0 top-14 bottom-0 bg-[#0f0f0f] border-r border-[#272727] transition-all duration-200 z-30 flex flex-col justify-between',
-      isCollapsed ? 'w-16' : 'w-60'
+      isDark ? 'bg-[#0f0f0f] border-[#272727]' : 'bg-white border-neutral-200',
+      isCollapsed ? 'w-16' : 'w-60',
+      'fixed left-0 top-14 bottom-0 border-r transition-all duration-200 z-30 flex flex-col justify-between'
     ]"
   >
     <div class="py-3 space-y-1">
@@ -39,7 +41,11 @@ const navItems = [
         :key="item.path"
         :to="item.path"
         class="flex items-center gap-4 px-4 py-3 mx-2 rounded-xl text-sm font-medium transition-colors"
-        :class="route.path === item.path ? 'bg-[#272727] text-white' : 'text-neutral-400 hover:bg-[#1a1a1a] hover:text-white'"
+        :class="[
+          route.path === item.path
+            ? (isDark ? 'bg-[#272727] text-white font-semibold' : 'bg-neutral-200 text-neutral-900 font-semibold')
+            : (isDark ? 'text-neutral-400 hover:bg-[#1a1a1a] hover:text-white' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900')
+        ]"
       >
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
@@ -48,12 +54,18 @@ const navItems = [
       </RouterLink>
     </div>
 
-    <!-- Mini stats footer sidebar -->
-    <div v-if="!isCollapsed" class="p-4 m-2 bg-[#181818] rounded-xl border border-[#272727] text-xs">
-      <p class="font-semibold text-neutral-300">Omni Pipeline v2.4</p>
+    <!-- Mini stats card -->
+    <div 
+      v-if="!isCollapsed" 
+      :class="[
+        isDark ? 'bg-[#181818] border-[#272727]' : 'bg-neutral-50 border-neutral-200',
+        'p-4 m-2 rounded-xl border text-xs transition-colors'
+      ]"
+    >
+      <p :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-800 font-semibold'">Omni Pipeline v2.4</p>
       <p class="text-neutral-500 mt-1">5 variantes configuradas</p>
-      <div class="mt-2.5 flex items-center gap-1.5 text-emerald-400">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+      <div class="mt-2.5 flex items-center gap-1.5 text-emerald-500 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
         <span>Motor Activo</span>
       </div>
     </div>

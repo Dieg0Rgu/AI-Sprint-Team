@@ -1,20 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+defineProps<{
+  searchQuery: string
+  isDark: boolean
+}>()
 
 const emit = defineEmits<{
   (e: 'toggle-sidebar'): void
+  (e: 'toggle-theme'): void
+  (e: 'update:searchQuery', value: string): void
+  (e: 'trigger-generate'): void
 }>()
-
-const searchQuery = ref('')
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 flex items-center justify-between h-14 px-4 bg-[#0f0f0f]/95 backdrop-blur border-b border-[#272727]">
-    <!-- Left: Hamburger & YouTube-style Studio Logo -->
-    <div class="flex items-center gap-4">
+  <header 
+    :class="[
+      isDark ? 'bg-[#0f0f0f] border-[#272727]' : 'bg-white border-neutral-200 shadow-sm',
+      'sticky top-0 z-40 flex items-center justify-between h-14 px-4 border-b transition-colors duration-200'
+    ]"
+  >
+    <!-- Left: Menú y Logo -->
+    <div class="flex items-center gap-3">
       <button 
         @click="emit('toggle-sidebar')"
-        class="p-2 rounded-full hover:bg-[#272727] text-white transition-colors"
+        type="button"
+        :class="isDark ? 'hover:bg-[#272727] text-white' : 'hover:bg-neutral-100 text-neutral-800'"
+        class="p-2 rounded-full transition-colors"
         title="Alternar menú"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,28 +34,42 @@ const searchQuery = ref('')
       </button>
 
       <RouterLink to="/" class="flex items-center gap-1.5 focus:outline-none">
-        <div class="w-8 h-6 bg-[#ff0000] rounded-lg flex items-center justify-center shadow-lg shadow-red-900/30">
+        <div class="w-8 h-6 bg-[#ff0000] rounded-lg flex items-center justify-center shadow-md shadow-red-600/30">
           <svg class="w-3.5 h-3.5 text-white fill-current ml-0.5" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
         </div>
         <div class="flex items-baseline">
-          <span class="text-lg font-bold tracking-tighter text-white">Omni</span>
-          <span class="text-xs font-semibold ml-1 px-1.5 py-0.5 rounded bg-[#272727] text-neutral-300">Studio</span>
+          <span :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-lg font-bold tracking-tighter">Omni</span>
+          <span :class="isDark ? 'bg-[#272727] text-neutral-300' : 'bg-neutral-200 text-neutral-800'" class="text-xs font-semibold ml-1 px-1.5 py-0.5 rounded">Studio</span>
         </div>
       </RouterLink>
     </div>
 
-    <!-- Center: Search input bar -->
-    <div class="hidden md:flex items-center w-full max-w-xl mx-4">
+    <!-- Center: Buscador -->
+    <div class="flex items-center w-full max-w-xs sm:max-w-md md:max-w-lg mx-2 sm:mx-4">
       <div class="flex w-full items-center">
         <input 
-          v-model="searchQuery" 
+          :value="searchQuery"
+          @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
           type="text" 
-          placeholder="Buscar campañas, variantes o formatos..." 
-          class="w-full bg-[#121212] border border-[#303030] focus:border-[#065fd4] rounded-l-full py-2 px-4 text-sm text-white focus:outline-none placeholder-neutral-500"
+          placeholder="Buscar por palabras clave en variantes..." 
+          :class="[
+            isDark 
+              ? 'bg-[#121212] border-[#303030] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
+              : 'bg-neutral-100 border-neutral-300 text-neutral-900 placeholder-neutral-500 focus:border-[#ff0000]',
+            'w-full border rounded-l-full py-1.5 sm:py-2 px-3 sm:px-4 text-xs sm:text-sm focus:outline-none transition-colors'
+          ]"
         />
-        <button class="bg-[#222222] border border-l-0 border-[#303030] hover:bg-[#272727] px-5 py-2 rounded-r-full text-neutral-400 hover:text-white transition-colors">
+        <button 
+          type="button" 
+          :class="[
+            isDark 
+              ? 'bg-[#222222] border-[#303030] text-neutral-400 hover:text-white hover:bg-[#272727]' 
+              : 'bg-neutral-200 border-neutral-300 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-300',
+            'border border-l-0 px-4 sm:px-5 py-1.5 sm:py-2 rounded-r-full transition-colors'
+          ]"
+        >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -52,19 +77,31 @@ const searchQuery = ref('')
       </div>
     </div>
 
-    <!-- Right: Studio Actions -->
-    <div class="flex items-center gap-3">
-      <RouterLink 
-        to="/" 
-        class="flex items-center gap-1.5 bg-[#272727] hover:bg-[#3f3f3f] text-white text-xs font-medium px-3.5 py-2 rounded-full transition-colors border border-[#383838]"
+    <!-- Right: Theme switcher y botón Generar -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <button 
+        type="button"
+        @click="emit('toggle-theme')"
+        :class="isDark ? 'border-[#303030] bg-[#1f1f1f] hover:bg-[#2e2e2e]' : 'border-neutral-300 bg-neutral-100 hover:bg-neutral-200'"
+        class="p-2 rounded-full border transition-all cursor-pointer flex items-center justify-center"
+        :title="isDark ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'"
       >
-        <span class="w-2 h-2 rounded-full bg-[#ff0000] animate-pulse"></span>
-        <span>+ Generar</span>
-      </RouterLink>
+        <svg v-if="isDark" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <svg v-else class="w-4 h-4 text-neutral-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      </button>
 
-      <div class="w-8 h-8 rounded-full bg-linear-to-tr from-red-600 to-amber-500 flex items-center justify-center font-bold text-xs text-white shadow-md">
-        AI
-      </div>
+      <button 
+        type="button"
+        @click="emit('trigger-generate')"
+        class="flex items-center gap-1.5 bg-[#ff0000] hover:bg-[#cc0000] text-white text-xs font-semibold px-3.5 py-2 rounded-full transition-colors shadow cursor-pointer"
+      >
+        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+        <span class="hidden sm:inline">+ Generar</span>
+      </button>
     </div>
   </header>
 </template>

@@ -13,7 +13,8 @@ export interface VariantItem {
   tag: string
 }
 
-withDefaults(
+// 1. Asignar las props a una constante para poder leer searchQuery
+const props = withDefaults(
   defineProps<{
     searchQuery?: string
     isDark?: boolean
@@ -25,14 +26,12 @@ withDefaults(
 )
 
 // URL de tu Webhook en n8n Cloud para generación
-const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook-test/generate-variants'
-
+// (Usa /webhook-test/ si haces pruebas manuales o /webhook/ con el workflow en "Publish")
+const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook-test/39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2'
 const inputPrompt = ref('')
 const selectedFilter = ref<'Todos' | ContentFormat>('Todos')
 const isGenerating = ref(false)
 const errorMessage = ref('')
-const isSyncing = ref(false)
-const syncSuccessMessage = ref('')
 
 // Variantes base cargadas por defecto
 const variants = ref<VariantItem[]>([
@@ -116,14 +115,32 @@ const editWordsCount = computed(() => {
 const editCharCount = computed(() => {
   return tempEditContent.value.length
 })
+// Opciones para la barra de filtros
+const filterOptions: Array<'Todos' | ContentFormat> = [
+  'Todos',
+  'Hilos',
+  'Artículos',
+  'Boletines',
+  'Videos',
+  'Audios'
+]
 
-// Filtros y conteos
-const filterOptions: Array<'Todos' | ContentFormat> = ['Todos', 'Hilos', 'Artículos', 'Boletines', 'Videos', 'Audios']
-
+// 2. Filtrar simultáneamente por Categoría (Pills) y por Búsqueda de Texto
 const filteredVariants = computed(() => {
+  const query = (props.searchQuery || '').toLowerCase().trim()
+
   return variants.value.filter(v => {
-    const matchesFilter = selectedFilter.value === 'Todos' || v.format === selectedFilter.value
-    return matchesFilter
+    // Filtro por categoría (Todos, Hilos, Artículos, etc.)
+    const matchesCategory = selectedFilter.value === 'Todos' || v.format === selectedFilter.value
+
+    // Filtro por término de búsqueda (busca en título, contenido, tag o formato)
+    const matchesSearch = !query || 
+      v.title.toLowerCase().includes(query) ||
+      v.content.toLowerCase().includes(query) ||
+      v.tag.toLowerCase().includes(query) ||
+      v.format.toLowerCase().includes(query)
+
+    return matchesCategory && matchesSearch
   })
 })
 

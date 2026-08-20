@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export type ContentFormat = 'Hilos' | 'Artículos' | 'Boletines' | 'Videos' | 'Audios'
 
@@ -29,6 +29,8 @@ const props = withDefaults(
 const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook/39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2'
 const N8N_SCHEDULE_URL = 'https://devaidiego.app.n8n.cloud/webhook/schedule-approved'
 
+const STORAGE_KEY = 'omnistudio_variants_cache'
+
 const inputPrompt = ref('')
 const selectedFilter = ref<'Todos' | ContentFormat>('Todos')
 const isGenerating = ref(false)
@@ -39,8 +41,8 @@ const isSyncing = ref(false)
 const syncSuccessMessage = ref('')
 const syncErrorMessage = ref('')
 
-// Variantes base cargadas por defecto
-const variants = ref<VariantItem[]>([
+// Variantes base cargadas por defecto si no hay nada guardado
+const defaultVariants: VariantItem[] = [
   {
     id: '1',
     format: 'Hilos',
@@ -86,7 +88,36 @@ const variants = ref<VariantItem[]>([
     durationOrLength: '8:30 min',
     tag: 'Podcast / Spotify'
   }
-])
+]
+
+// Función para inicializar datos desde localStorage
+const loadSavedVariants = (): VariantItem[] => {
+  if (typeof window === 'undefined') return defaultVariants
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (saved) {
+    try {
+      return JSON.parse(saved)
+    } catch {
+      return defaultVariants
+    }
+  }
+  return defaultVariants
+}
+
+const variants = ref<VariantItem[]>(loadSavedVariants())
+
+// Guardar reactivamente cada cambio, edición o generación en el navegador
+watch(
+  variants,
+  (newVariants) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newVariants))
+    } catch (e) {
+      console.error('Error al guardar en localStorage:', e)
+    }
+  },
+  { deep: true }
+)
 
 // ESTADO PARA EL MODAL DE EDICIÓN
 const editingVariant = ref<VariantItem | null>(null)

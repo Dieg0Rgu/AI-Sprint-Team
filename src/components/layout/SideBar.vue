@@ -1,73 +1,106 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { RouterLink } from 'vue-router'
+import { useLanguage } from '../../composables/useLanguage'
+import { useHistory } from '../../composables/useHistory'
 
-defineProps<{
-  isCollapsed: boolean
-  isDark: boolean
-}>()
+defineProps<{ isDark: boolean }>()
 
-const route = useRoute()
-
-const navItems = [
-  {
-    name: 'Estudio Creativo',
-    path: '/',
-    icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10'
-  },
-  {
-    name: 'Motores & Formatos',
-    path: '/services',
-    icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
-  },
-  {
-    name: 'Soporte & API',
-    path: '/contact',
-    icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
-  }
-]
+const { t } = useLanguage()
+const { historyList, activeSessionId, deleteSession } = useHistory()
 </script>
 
 <template>
   <aside 
-    :class="[
-      isDark ? 'bg-[#0f0f0f] border-[#272727]' : 'bg-white border-neutral-200',
-      isCollapsed ? 'w-16' : 'w-60',
-      'fixed left-0 top-14 bottom-0 border-r transition-all duration-200 z-30 flex flex-col justify-between'
-    ]"
+    :class="isDark ? 'bg-[#121215] border-[#26262f] text-neutral-200' : 'bg-white border-neutral-200 text-neutral-800 shadow-sm'"
+    class="w-64 border-r p-4 flex-col justify-between hidden md:flex shrink-0 transition-colors z-20"
   >
-    <div class="py-3 space-y-1">
-      <RouterLink 
-        v-for="item in navItems" 
-        :key="item.path"
-        :to="item.path"
-        class="flex items-center gap-4 px-4 py-3 mx-2 rounded-xl text-sm font-medium transition-colors"
-        :class="[
-          route.path === item.path
-            ? (isDark ? 'bg-[#272727] text-white font-semibold' : 'bg-neutral-200 text-neutral-900 font-semibold')
-            : (isDark ? 'text-neutral-400 hover:bg-[#1a1a1a] hover:text-white' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900')
-        ]"
-      >
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" :d="item.icon" />
-        </svg>
-        <span v-if="!isCollapsed" class="truncate">{{ item.name }}</span>
-      </RouterLink>
+    <div class="space-y-4">
+      <!-- Navegación Primaria -->
+      <nav class="space-y-1 text-xs font-semibold">
+        <RouterLink
+          to="/"
+          class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+          :class="isDark ? 'text-neutral-300 hover:bg-[#1c1c24]' : 'text-neutral-700 hover:bg-neutral-100'"
+          active-class="!bg-[#ff0000]/15 !text-[#ff2b2b] font-bold border border-[#ff0000]/30 shadow-sm"
+        >
+          <span>🎨</span>
+          <span>{{ t.navStudio }}</span>
+        </RouterLink>
+
+        <RouterLink
+          to="/engines"
+          class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+          :class="isDark ? 'text-neutral-300 hover:bg-[#1c1c24]' : 'text-neutral-700 hover:bg-neutral-100'"
+          active-class="!bg-[#ff0000]/15 !text-[#ff2b2b] font-bold border border-[#ff0000]/30 shadow-sm"
+        >
+          <span>⚙️</span>
+          <span>{{ t.navEngines }}</span>
+        </RouterLink>
+
+        <RouterLink
+          to="/contact"
+          class="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+          :class="isDark ? 'text-neutral-300 hover:bg-[#1c1c24]' : 'text-neutral-700 hover:bg-neutral-100'"
+          active-class="!bg-[#ff0000]/15 !text-[#ff2b2b] font-bold border border-[#ff0000]/30 shadow-sm"
+        >
+          <span>💬</span>
+          <span>{{ t.navSupport }}</span>
+        </RouterLink>
+      </nav>
+
+      <!-- Historial de Premisas Guardadas (Estilo Chat) -->
+      <div class="pt-3 border-t" :class="isDark ? 'border-[#26262f]' : 'border-neutral-200'">
+        <div class="flex items-center justify-between px-1 mb-2">
+          <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Historial de Premisas</span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 font-mono">{{ historyList.length }}</span>
+        </div>
+
+        <div class="space-y-1 max-h-[42vh] overflow-y-auto pr-1">
+          <div 
+            v-if="historyList.length === 0" 
+            class="text-[11px] opacity-40 px-2 py-3 text-center italic"
+          >
+            No hay premisas previas
+          </div>
+
+          <div
+            v-for="item in historyList"
+            :key="item.id"
+            @click="activeSessionId = item.id"
+            :class="[
+              activeSessionId === item.id 
+                ? (isDark ? 'bg-[#1c1c24] border-[#383848] text-white' : 'bg-neutral-100 border-neutral-300 text-black font-semibold')
+                : (isDark ? 'text-neutral-400 hover:bg-[#18181f] hover:text-white border-transparent' : 'text-neutral-600 hover:bg-neutral-50 border-transparent'),
+              'group flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer border transition-all'
+            ]"
+          >
+            <div class="truncate flex items-center gap-2">
+              <span class="text-[10px] opacity-60">💬</span>
+              <span class="truncate">{{ item.prompt }}</span>
+            </div>
+
+            <button 
+              @click.stop="deleteSession(item.id)" 
+              class="opacity-0 group-hover:opacity-100 hover:text-red-400 text-[10px] p-0.5 transition-opacity"
+              title="Eliminar"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Mini stats card -->
+    <!-- Indicador de Versión / Motor Activo -->
     <div 
-      v-if="!isCollapsed" 
-      :class="[
-        isDark ? 'bg-[#181818] border-[#272727]' : 'bg-neutral-50 border-neutral-200',
-        'p-4 m-2 rounded-xl border text-xs transition-colors'
-      ]"
+      :class="isDark ? 'bg-[#17171c] border-[#292936] text-neutral-300' : 'bg-neutral-100 border-neutral-200 text-neutral-700'"
+      class="p-3 rounded-xl border text-[11px] shadow-sm"
     >
-      <p :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-800 font-semibold'">Omni Pipeline v2.4</p>
-      <p class="text-neutral-500 mt-1">5 variantes configuradas</p>
-      <div class="mt-2.5 flex items-center gap-1.5 text-emerald-500 font-medium">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-        <span>Motor Activo</span>
+      <div class="font-bold flex items-center justify-between">
+        <span>{{ t.pipelineVersion }}</span>
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
       </div>
+      <div class="text-[10px] text-emerald-400 font-medium mt-1">{{ t.pipelineStatus }}</div>
     </div>
   </aside>
 </template>

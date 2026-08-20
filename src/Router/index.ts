@@ -1,29 +1,29 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import ServicesView from '../views/ServicesView.vue'
 import ContactView from '../views/ContactView.vue'
 
-const routes: Array<RouteRecordRaw> = [
-  {
-    path: '/',
-    name: 'Home',
-    component: HomeView
-  },
-  {
-    path: '/services',
-    name: 'Services',
-    component: ServicesView
-  },
-  {
-    path: '/contact',
-    name: 'Contact',
-    component: ContactView
-  }
-]
-
 const router = createRouter({
-  history: createWebHistory(),
-  routes
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: HomeView
+    },
+    {
+      path: '/engines',
+      alias: ['/services', '/motores'], // Soporta ambas rutas
+      name: 'engines',
+      component: ServicesView
+    },
+    {
+      path: '/contact',
+      alias: ['/soporte'],
+      name: 'contact',
+      component: ContactView
+    }
+  ]
 })
 
 export default router

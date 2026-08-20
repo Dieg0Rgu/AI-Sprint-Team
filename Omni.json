@@ -44,7 +44,7 @@
         "messages": {
           "messageValues": [
             {
-              "message": "=Eres un generador de contenido omnicanal para OmniStudio. Transforma la premisa del usuario en exactamente 5 variantes con formato JSON estricto: Hilos, Artículos, Boletines, Videos y Audios.  Debes responder ÚNICAMENTE un JSON válido con esta estructura exacta sin explicaciones adicionales: {   \"variants\": [     {       \"id\": \"1\",       \"format\": \"Hilos\",       \"title\": \"Título con gancho para X/Twitter\",       \"content\": \"1/5 Texto del hilo...\",       \"durationOrLength\": \"5 Tweets\",       \"tag\": \"X / Twitter\"     },     {       \"id\": \"2\",       \"format\": \"Artículos\",       \"title\": \"Título SEO para blog\",       \"content\": \"Texto del artículo...\",       \"durationOrLength\": \"950 palabras\",       \"tag\": \"Blog / Medium\"     },     {       \"id\": \"3\",       \"format\": \"Boletines\",       \"title\": \"Asunto del newsletter\",       \"content\": \"Texto del boletín...\",       \"durationOrLength\": \"Lectura 2 min\",       \"tag\": \"Substack\"     },     {       \"id\": \"4\",       \"format\": \"Videos\",       \"title\": \"Título de alto impacto\",       \"content\": \"[00:00 - GANCHO] Guión del video...\",       \"durationOrLength\": \"0:50 min\",       \"tag\": \"YouTube Shorts\"     },     {       \"id\": \"5\",       \"format\": \"Audios\",       \"title\": \"Pauta de podcast\",       \"content\": \"[Voz de locutor] Pauta de audio...\",       \"durationOrLength\": \"4:30 min\",       \"tag\": \"Audiograma\"     }   ] }"
+              "message": "=Eres un director editorial y estratega de contenido omnicanal para OmniStudio.\n\nPremisa: {{ $json.body.prompt }}\nTono: {{ $json.body.tone || 'Directo & Viral' }}\nAudiencia: {{ $json.body.audience || 'Creadores & Emprendedores' }}\nIdioma: {{ $json.body.language || 'Español' }}\nFormato Solicitado: {{ $json.body.targetFormat || 'TODOS' }}\n\nINSTRUCCIONES:\n- Si \"Formato Solicitado\" es TODOS, genera un JSON con la lista \"variants\" con las 5 variantes: Hilos (X/Twitter), Artículos (Blog/Medium), Boletines (Substack), Videos (YouTube Shorts) y Audios (Podcast).\n- Si \"Formato Solicitado\" especifica un solo formato (ej. \"Hilos\"), genera el array \"variants\" conteniendo únicamente esa variante optimizada bajo el tono y audiencia solicitados.\n- Todo el contenido y títulos deben estar redactados en el idioma: {{ $json.body.language || 'Español' }}.\n\nRetorna únicamente el JSON válido con el esquema solicitado:\n{\n  \"variants\": [\n    {\n      \"id\": \"1\",\n      \"format\": \"Hilos\",\n      \"title\": \"...\",\n      \"content\": \"...\",\n      \"isApproved\": false,\n      \"durationOrLength\": \"...\",\n      \"tag\": \"X / Twitter\"\n    }\n  ]\n}"
             }
           ]
         },
@@ -251,7 +251,7 @@
         "fieldsUi": {
           "fieldValues": [
             {
-              "fieldId": "title",
+              "fieldId": "=title",
               "fieldValue": "=={{ $json.title }}"
             },
             {
@@ -267,7 +267,7 @@
               "fieldValue": "=={{ $json.tag }}"
             },
             {
-              "fieldId": "scheduled_at",
+              "fieldId": "created_at",
               "fieldValue": "=={{ $json.scheduled_start }}"
             },
             {
@@ -287,8 +287,8 @@
       "name": "Create a row",
       "credentials": {
         "supabaseApi": {
-          "id": "tA8n5OB7xybkvyTT",
-          "name": "Supabase account"
+          "id": "0yDBiM9VMZzfg4Ug",
+          "name": "Supabase account 2"
         }
       }
     },
@@ -487,7 +487,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "362d7027-ea80-4dd1-a28e-1e2038a61fc1",
+  "versionId": "7405e3d0-0a41-4669-b9e6-047d5c7310a1",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "842c97be54ed516d58ed7d7b75500bffc7664899af7b165bbbf537a9d1a0d7b9"

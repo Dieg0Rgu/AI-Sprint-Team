@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import Swal from 'sweetalert2'
+import { useLanguage } from '../composables/useLanguage'
+import { useHistory } from '../composables/useHistory'
 
 export type ContentFormat = 'Hilos' | 'Artículos' | 'Boletines' | 'Videos' | 'Audios'
 
@@ -13,7 +16,6 @@ export interface VariantItem {
   tag: string
 }
 
-// 1. Asignar las props a una constante para poder leer searchQuery
 const props = withDefaults(
   defineProps<{
     searchQuery?: string
@@ -25,191 +27,241 @@ const props = withDefaults(
   }
 )
 
-// URLs de los Webhooks en n8n Cloud
+const { currentLang, toggleLang, t } = useLanguage()
+const { historyList, activeSessionId, saveSession, updateCurrentSession } = useHistory()
+
 const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook/39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2'
 const N8N_SCHEDULE_URL = 'https://devaidiego.app.n8n.cloud/webhook/schedule-approved'
 
-const STORAGE_KEY = 'omnistudio_variants_cache'
-
 const inputPrompt = ref('')
-const selectedFilter = ref<'Todos' | ContentFormat>('Todos')
+const followUpPrompt = ref('')
+const selectedTone = ref('Directo & Viral')
+const selectedAudience = ref('Creadores & Emprendedores')
+const selectedLanguage = ref<'Español' | 'Inglés'>('Español')
+const showExportDropdown = ref(false)
 const isGenerating = ref(false)
-const errorMessage = ref('')
-
-// Estado para el tercer flujo (Sincronización con Supabase y Calendar)
+const regeneratingId = ref<string | null>(null)
 const isSyncing = ref(false)
-const syncSuccessMessage = ref('')
-const syncErrorMessage = ref('')
 
-// Variantes base cargadas por defecto si no hay nada guardado
-const defaultVariants: VariantItem[] = [
-  {
-    id: '1',
-    format: 'Hilos',
-    title: '1/7 Por qué el 90% de los creadores se estancan en la etapa de preproducción 🧵',
-    content: `1/7 Crear contenido diario es insostenible si redactas todo de cero.\n\n2/7 El secreto está en la atomización: una idea central se convierte en 5 piezas estructuradas.\n\n3/7 Hoy liberamos nuestro motor que transforma una simple frase en guiones listos para publicar.`,
-    isApproved: false,
-    durationOrLength: '7 Tweets',
-    tag: 'X / Twitter'
-  },
-  {
-    id: '2',
-    format: 'Artículos',
-    title: 'La Guía Definitiva: Cómo Escalar tu Distribución Omnicanal con IA',
-    content: `La fatiga de creación es el mayor cuello de botella para marcas y agencias. Implementar un pipeline asistido permite reducir el tiempo de redacción de 6 horas a 20 minutos, priorizando el criterio editorial y la curaduría sobre el bloqueo de la página en blanco.`,
-    isApproved: true,
-    durationOrLength: '1,200 palabras',
-    tag: 'Blog / Medium'
-  },
-  {
-    id: '3',
-    format: 'Boletines',
-    title: 'Edición #42: De 0 a 100k impresiones sin grabar 10 horas semanales',
-    content: `Hola creador,\n\nEsta semana analizamos la metodología de contenido modular. Descubre la plantilla exacta para convertir una tesis en hilos, reels y podcasts sin perder autenticidad.`,
-    isApproved: false,
-    durationOrLength: 'Lectura de 3 min',
-    tag: 'Substack'
-  },
-  {
-    id: '4',
-    format: 'Videos',
-    title: 'Guión para YouTube Shorts / Reels: El Hack de Contenido que Nadie te Cuenta',
-    content: `[00:00 - GANCHO] (Mostrar pantalla de notas vacía) "Deja de perder 4 horas pensando qué publicar hoy."\n[00:05 - PROBLEMA] Todos intentan crear contenido nuevo todos los días.\n[00:15 - SOLUCIÓN] Mira cómo transformo este párrafo en 5 formatos con un solo clic.\n[00:30 - CTA] Comenta ESTUDIO y te paso el acceso.`,
-    isApproved: false,
-    durationOrLength: '0:45 min',
-    tag: 'YouTube Shorts'
-  },
-  {
-    id: '5',
-    format: 'Audios',
-    title: 'Estructura Episodio Podcast: Automatización Creativa y el Futuro de la Atención',
-    content: `[INTRODUCCIÓN CON MÚSICA LIGERA]\n"Bienvenidos a Frecuencia Creadora. Hoy conversamos sobre por qué la distribución omnicanal ya no es opcional si quieres construir una audiencia sólida..."\n[SEGMENTO 1: LA CRISIS DEL TIEMPO CREATIVO]\n[SEGMENTO 2: DEMOSTRACIÓN DEL WORKFLOW EN VIVO]`,
-    isApproved: false,
-    durationOrLength: '8:30 min',
-    tag: 'Podcast / Spotify'
-  }
-]
-
-// Función para inicializar datos desde localStorage
-const loadSavedVariants = (): VariantItem[] => {
-  if (typeof window === 'undefined') return defaultVariants
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) {
-    try {
-      return JSON.parse(saved)
-    } catch {
-      return defaultVariants
-    }
-  }
-  return defaultVariants
-}
-
-const variants = ref<VariantItem[]>(loadSavedVariants())
-
-// Guardar reactivamente cada cambio, edición o generación en el navegador
-watch(
-  variants,
-  (newVariants) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newVariants))
-    } catch (e) {
-      console.error('Error al guardar en localStorage:', e)
-    }
-  },
-  { deep: true }
-)
-
-// ESTADO PARA EL MODAL DE EDICIÓN
-const editingVariant = ref<VariantItem | null>(null)
+// Editor Modal para variantes
+const activeEditingVariant = ref<VariantItem | null>(null)
 const tempEditTitle = ref('')
 const tempEditContent = ref('')
 
+// Modal estándar con tema oscuro/claro
+const notify = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
+  return Swal.fire({
+    title,
+    text,
+    icon,
+    background: props.isDark ? '#141418' : '#ffffff',
+    color: props.isDark ? '#ffffff' : '#111827',
+    confirmButtonColor: '#ff0000',
+    customClass: {
+      popup: 'rounded-2xl border border-neutral-700 shadow-2xl',
+      confirmButton: 'rounded-xl text-xs font-semibold px-5 py-2.5'
+    }
+  })
+}
+
+// Notificación Toast rápida para acciones menores (ej. copiar)
+const notifyToast = (title: string, icon: 'success' | 'info' = 'success') => {
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 2000,
+    timerProgressBar: true,
+    background: props.isDark ? '#141418' : '#ffffff',
+    color: props.isDark ? '#ffffff' : '#111827',
+    customClass: {
+      popup: 'rounded-xl border border-neutral-700 shadow-lg text-xs'
+    }
+  })
+  Toast.fire({ icon, title })
+}
+
+const toneOptions = computed(() => [
+  { value: 'Directo & Viral', label: t.value?.tones?.viral || 'Directo & Viral' },
+  { value: 'Corporativo B2B', label: t.value?.tones?.b2b || 'Corporativo B2B' },
+  { value: 'Storytelling Emocional', label: t.value?.tones?.story || 'Storytelling Emocional' },
+  { value: 'Técnico & Analítico', label: t.value?.tones?.tech || 'Técnico & Analítico' }
+])
+
+const audienceOptions = computed(() => [
+  { value: 'Creadores & Emprendedores', label: t.value?.audiences?.creators || 'Creadores & Emprendedores' },
+  { value: 'Desarrolladores & Tech', label: t.value?.audiences?.devs || 'Desarrolladores & Tech' },
+  { value: 'Ejecutivos B2B', label: t.value?.audiences?.execs || 'Ejecutivos B2B' },
+  { value: 'Audiencia General', label: t.value?.audiences?.general || 'Audiencia General' }
+])
+
+// Sesión activa seleccionada desde el sidebar
+const activeSession = computed(() => {
+  return historyList.value.find(s => s.id === activeSessionId.value) || null
+})
+
+const startNewChat = () => {
+  activeSessionId.value = null
+  inputPrompt.value = ''
+  followUpPrompt.value = ''
+}
+
+const approvedCount = computed(() => {
+  if (!activeSession.value?.variants) return 0
+  return activeSession.value.variants.filter(v => v.isApproved).length
+})
+
+const toggleApproval = (variantId: string) => {
+  if (!activeSession.value) return
+  const item = activeSession.value.variants.find(v => v.id === variantId)
+  if (item) {
+    item.isApproved = !item.isApproved
+    notifyToast(
+      item.isApproved 
+        ? (currentLang.value === 'es' ? 'Pieza marcada como aprobada' : 'Piece approved')
+        : (currentLang.value === 'es' ? 'Pieza desaprobada' : 'Piece disapproved'),
+      'info'
+    )
+  }
+}
+
 const openEditModal = (variant: VariantItem) => {
-  editingVariant.value = variant
+  activeEditingVariant.value = variant
   tempEditTitle.value = variant.title
   tempEditContent.value = variant.content
 }
 
-const closeEditModal = () => {
-  editingVariant.value = null
-  tempEditTitle.value = ''
-  tempEditContent.value = ''
-}
-
 const saveEdit = () => {
-  if (editingVariant.value) {
-    editingVariant.value.title = tempEditTitle.value
-    editingVariant.value.content = tempEditContent.value
+  if (activeEditingVariant.value) {
+    activeEditingVariant.value.title = tempEditTitle.value
+    activeEditingVariant.value.content = tempEditContent.value
+    notifyToast(currentLang.value === 'es' ? 'Cambios guardados' : 'Changes saved', 'success')
   }
-  closeEditModal()
+  activeEditingVariant.value = null
 }
 
-// Estadísticas en vivo del modal
-const editWordsCount = computed(() => {
-  return tempEditContent.value.trim() ? tempEditContent.value.trim().split(/\s+/).length : 0
-})
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text)
+  notifyToast(
+    currentLang.value === 'es' ? 'Texto copiado al portapapeles' : 'Copied to clipboard',
+    'success'
+  )
+}
 
-const editCharCount = computed(() => {
-  return tempEditContent.value.length
-})
+// Mapeo seguro protegido contra undefined
+const getTranslatedFormatName = (fmt?: string | ContentFormat) => {
+  if (!fmt) return 'CONTENIDO'
+  
+  const formats = t.value?.formats
+  let translated = String(fmt)
 
-// Opciones para la barra de filtros
-const filterOptions: Array<'Todos' | ContentFormat> = [
-  'Todos',
-  'Hilos',
-  'Artículos',
-  'Boletines',
-  'Videos',
-  'Audios'
-]
+  switch (fmt) {
+    case 'Hilos':
+    case 'Threads':
+      translated = formats?.threads || 'Hilos'
+      break
+    case 'Artículos':
+    case 'Articles':
+      translated = formats?.articles || 'Artículos'
+      break
+    case 'Boletines':
+    case 'Newsletters':
+      translated = formats?.newsletters || 'Boletines'
+      break
+    case 'Videos':
+      translated = formats?.videos || 'Videos'
+      break
+    case 'Audios':
+      translated = formats?.audios || 'Audios'
+      break
+    default:
+      translated = String(fmt)
+  }
 
-// 2. Filtrar simultáneamente por Categoría (Pills) y por Búsqueda de Texto
-const filteredVariants = computed(() => {
-  const query = (props.searchQuery || '').toLowerCase().trim()
+  return (translated || 'CONTENIDO').toUpperCase()
+}
 
-  return variants.value.filter(v => {
-    const matchesCategory = selectedFilter.value === 'Todos' || v.format === selectedFilter.value
-    const matchesSearch = !query || 
-      v.title.toLowerCase().includes(query) ||
-      v.content.toLowerCase().includes(query) ||
-      v.tag.toLowerCase().includes(query) ||
-      v.format.toLowerCase().includes(query)
-
-    return matchesCategory && matchesSearch
-  })
-})
-
-const approvedCount = computed(() => variants.value.filter(v => v.isApproved).length)
-
-const toggleApproval = (id: string) => {
-  const item = variants.value.find(v => v.id === id)
-  if (item) {
-    item.isApproved = !item.isApproved
+const getFormatBadgeStyle = (format: ContentFormat) => {
+  switch (format) {
+    case 'Hilos': return 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+    case 'Artículos': return 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+    case 'Boletines': return 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+    case 'Videos': return 'bg-red-500/20 text-red-300 border border-red-500/40'
+    case 'Audios': return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+    default: return 'bg-neutral-800 text-neutral-300'
   }
 }
 
-// Generación con n8n (Flujo 1)
-const generateVariants = async () => {
-  if (!inputPrompt.value.trim() || isGenerating.value) return
+// Exportación
+const exportContent = (fileFormat: 'md' | 'json' | 'txt') => {
+  showExportDropdown.value = false
+  const targetVariants = activeSession.value?.variants || []
+
+  if (!targetVariants.length) {
+    notify('Aviso', currentLang.value === 'es' ? 'No hay variantes que exportar.' : 'No variants to export.', 'info')
+    return
+  }
+
+  let contentData = ''
+  let mimeType = 'text/plain'
+  const dateStr = new Date().toISOString().split('T')[0]
+  const fileName = `omnistudio-conversation-${dateStr}.${fileFormat}`
+
+  if (fileFormat === 'json') {
+    contentData = JSON.stringify(targetVariants, null, 2)
+    mimeType = 'application/json'
+  } else if (fileFormat === 'md') {
+    mimeType = 'text/markdown'
+    contentData = targetVariants.map(v => (
+      `# [${getTranslatedFormatName(v?.format)}] ${v?.title || ''}\n\n` +
+      `> **Platform:** ${v?.tag || ''} | **Length:** ${v?.durationOrLength || ''} | **Approved:** ${v?.isApproved ? 'Yes' : 'No'}\n\n` +
+      `${v?.content || ''}\n\n---\n`
+    )).join('\n')
+  } else {
+    contentData = targetVariants.map(v => (
+      `==============================\n` +
+      `FORMAT: ${getTranslatedFormatName(v?.format)} (${v?.tag || ''})\n` +
+      `TITLE: ${v?.title || ''}\n` +
+      `==============================\n\n${v?.content || ''}\n\n\n`
+    )).join('\n')
+  }
+
+  const blob = new Blob([contentData], { type: `${mimeType};charset=utf-8` })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  notifyToast(
+    currentLang.value === 'es' ? `Archivo ${fileFormat.toUpperCase()} descargado` : `File ${fileFormat.toUpperCase()} exported`,
+    'success'
+  )
+}
+
+// Generación inicial o continuación dentro del mismo chat
+const handleGenerate = async (isFollowUp = false) => {
+  const promptToSend = isFollowUp ? followUpPrompt.value.trim() : inputPrompt.value.trim()
+  if (!promptToSend || isGenerating.value) return
   isGenerating.value = true
-  errorMessage.value = ''
 
   try {
     const response = await fetch(N8N_GENERATE_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
-        prompt: inputPrompt.value.trim()
+        prompt: promptToSend,
+        contextPrompt: isFollowUp ? activeSession.value?.prompt : '',
+        tone: selectedTone.value,
+        audience: selectedAudience.value,
+        language: selectedLanguage.value
       })
     })
 
-    if (!response.ok) {
-      throw new Error(`Error en el servidor n8n: ${response.status}`)
-    }
-
+    if (!response.ok) throw new Error(`Error: ${response.status}`)
     const data = await response.json()
 
     let receivedVariants: any[] = []
@@ -220,377 +272,517 @@ const generateVariants = async () => {
     }
 
     if (receivedVariants.length > 0) {
-      variants.value = receivedVariants.map((v: Partial<VariantItem>, index: number) => ({
+      const parsedVariants: VariantItem[] = receivedVariants.map((v: Partial<VariantItem>, index: number) => ({
         id: String(v.id || `${Date.now()}-${index}`),
         format: (v.format as ContentFormat) || 'Hilos',
-        title: String(v.title || 'Variante Generada'),
+        title: String(v.title || 'Variant Generated'),
         content: String(v.content || ''),
-        isApproved: Boolean(v.isApproved ?? false),
+        isApproved: Boolean(v.isApproved ?? true),
         durationOrLength: String(v.durationOrLength || 'N/A'),
         tag: String(v.tag || 'OmniStudio')
       }))
+
+      if (isFollowUp && activeSession.value) {
+        updateCurrentSession(parsedVariants)
+        followUpPrompt.value = ''
+        notify(
+          currentLang.value === 'es' ? '¡Conversación Actualizada!' : 'Thread Updated!',
+          currentLang.value === 'es'
+            ? 'Se han refinado y regenerado las variantes de esta sesión con éxito.'
+            : 'The variants in this session have been refined successfully.',
+          'success'
+        )
+      } else {
+        saveSession(promptToSend, parsedVariants)
+        inputPrompt.value = ''
+        notify(
+          currentLang.value === 'es' ? '¡Variantes Generadas!' : 'Variants Generated!',
+          currentLang.value === 'es'
+            ? 'Las 5 piezas omnicanal fueron procesadas exitosamente por n8n.'
+            : 'All 5 omnichannel pieces have been processed successfully by n8n.',
+          'success'
+        )
+      }
     }
-  } catch (error: any) {
-    console.error('Error al generar con n8n:', error)
-    errorMessage.value = 'No se pudo conectar con el flujo de generación en n8n.'
+  } catch (error) {
+    console.error('Error:', error)
+    notify('Error', currentLang.value === 'es' ? 'Fallo de conexión con n8n.' : 'Connection failure with n8n.', 'error')
   } finally {
     isGenerating.value = false
   }
 }
 
-// Programación Omnicanal de Aprobados (Flujo 3: Supabase + Google Calendar)
-const scheduleApproved = async () => {
-  const approvedList = variants.value.filter(v => v.isApproved)
-  if (!approvedList.length || isSyncing.value) return
+// Regeneración individual
+const regenerateSingleVariant = async (variant: VariantItem) => {
+  if (regeneratingId.value || !activeSession.value) return
+  regeneratingId.value = variant.id
 
+  try {
+    const response = await fetch(N8N_GENERATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        prompt: activeSession.value.prompt || variant.title,
+        targetFormat: variant.format,
+        tone: selectedTone.value,
+        audience: selectedAudience.value,
+        language: selectedLanguage.value
+      })
+    })
+
+    if (!response.ok) throw new Error(`Error: ${response.status}`)
+    const data = await response.json()
+
+    let newPiece: Partial<VariantItem> | null = null
+    if (Array.isArray(data)) {
+      const list = data[0]?.variants || data
+      newPiece = list.find((item: any) => item.format === variant.format) || list[0]
+    } else if (data && Array.isArray(data.variants)) {
+      newPiece = data.variants.find((item: any) => item.format === variant.format) || data.variants[0]
+    } else if (data && data.title && data.content) {
+      newPiece = data
+    }
+
+    if (newPiece) {
+      const index = activeSession.value.variants.findIndex(v => v.id === variant.id)
+      if (index !== -1) {
+        activeSession.value.variants[index] = {
+          ...activeSession.value.variants[index],
+          title: newPiece.title || activeSession.value.variants[index].title,
+          content: newPiece.content || activeSession.value.variants[index].content,
+          durationOrLength: newPiece.durationOrLength || activeSession.value.variants[index].durationOrLength,
+          tag: newPiece.tag || activeSession.value.variants[index].tag
+        }
+
+        notify(
+          currentLang.value === 'es' ? '¡Pieza Regenerada!' : 'Piece Regenerated!',
+          currentLang.value === 'es'
+            ? `Se ha generado un nuevo enfoque para [${getTranslatedFormatName(variant.format)}].`
+            : `A new take was generated for [${getTranslatedFormatName(variant.format)}].`,
+          'success'
+        )
+      }
+    }
+  } catch (err) {
+    console.error('Error al regenerar:', err)
+    notify(
+      'Error',
+      currentLang.value === 'es' ? 'No se pudo regenerar esta variante.' : 'Failed to regenerate this variant.',
+      'error'
+    )
+  } finally {
+    regeneratingId.value = null
+  }
+}
+
+// Programar variantes
+const scheduleApproved = async () => {
+  const approvedList = activeSession.value?.variants.filter(v => v.isApproved) || []
+  if (!approvedList.length || isSyncing.value) return
   isSyncing.value = true
-  syncSuccessMessage.value = ''
-  syncErrorMessage.value = ''
 
   try {
     const res = await fetch(N8N_SCHEDULE_URL, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ approvedVariants: approvedList })
     })
 
-    if (!res.ok) throw new Error(`Error en n8n: ${res.status}`)
+    if (!res.ok) throw new Error(`Error: ${res.status}`)
 
-    syncSuccessMessage.value = `¡${approvedList.length} piezas agendadas en Calendar y guardadas en Supabase!`
-    setTimeout(() => {
-      syncSuccessMessage.value = ''
-    }, 4500)
-  } catch (err: any) {
-    console.error('Error al sincronizar con n8n:', err)
-    syncErrorMessage.value = 'Error al conectar con el flujo de agendamiento.'
-    setTimeout(() => {
-      syncErrorMessage.value = ''
-    }, 4500)
+    notify(
+      currentLang.value === 'es' ? '¡Programación Exitosa!' : 'Sync Complete!',
+      currentLang.value === 'es'
+        ? `Se agendaron ${approvedList.length} piezas en Google Calendar y Supabase.`
+        : `${approvedList.length} pieces scheduled in Google Calendar and Supabase.`,
+      'success'
+    )
+  } catch (err) {
+    console.error(err)
+    notify('Error', currentLang.value === 'es' ? 'Error al agendar.' : 'Failed to schedule.', 'error')
   } finally {
     isSyncing.value = false
-  }
-}
-
-// Estilos de Insignias por formato
-const getFormatBadgeStyle = (format: ContentFormat) => {
-  switch (format) {
-    case 'Hilos':
-      return 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-    case 'Artículos':
-      return 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-    case 'Boletines':
-      return 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-    case 'Videos':
-      return 'bg-red-500/10 text-red-400 border border-red-500/20'
-    case 'Audios':
-      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-    default:
-      return 'bg-neutral-800 text-neutral-300'
   }
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-7xl mx-auto space-y-6">
+  <div class="flex flex-col h-[calc(100vh-3.5rem-2.75rem)] max-w-5xl mx-auto w-full px-4 md:px-8">
     
-    <!-- SECCIÓN 1: PANEL DE ENTRADA Y CONTROL -->
-    <div 
-      :class="[
-        isDark ? 'bg-[#181818] border-[#272727]' : 'bg-white border-neutral-200 shadow-sm',
-        'border rounded-2xl p-6 transition-all relative overflow-hidden'
-      ]"
-    >
-      <div class="flex items-center justify-between pb-4 mb-4 border-b" :class="isDark ? 'border-[#272727]' : 'border-neutral-200'">
-        <div class="flex items-center gap-2.5">
-          <span class="w-3.5 h-3.5 bg-[#ff0000] rounded-sm shadow-sm"></span>
-          <div>
-            <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-xl font-bold tracking-tight">
-              Central de Inteligencia de Contenido
+    <!-- ESTADO 1: PANTALLA INICIAL (NUEVO CHAT) -->
+    <div v-if="!activeSession" class="flex-1 flex flex-col justify-center items-center py-8">
+      <div 
+        :class="[
+          isDark ? 'bg-[#141418] border-[#292936] shadow-2xl' : 'bg-white border-neutral-200 shadow-xl',
+          'border rounded-3xl p-6 md:p-8 w-full max-w-4xl transition-all'
+        ]"
+      >
+        <div class="flex items-center justify-between pb-4 mb-4 border-b" :class="isDark ? 'border-[#262633]' : 'border-neutral-200'">
+          <div class="flex items-center gap-3">
+            <span class="w-3.5 h-3.5 bg-[#ff0000] rounded-sm shadow-sm"></span>
+            <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-base font-bold tracking-tight">
+              {{ t?.headerTitle || 'Content Intelligence Hub' }}
             </h1>
-            <p :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="text-xs">
-              Ingresa tu premisa y genera instantáneamente variantes para 5 canales mediante n8n.
-            </p>
+          </div>
+          
+          <button
+            @click="toggleLang"
+            :class="[
+              isDark ? 'bg-[#1e1e26] border-[#333342] text-neutral-200 hover:bg-[#282833]' : 'bg-neutral-100 border-neutral-300 text-neutral-800 hover:bg-neutral-200',
+              'border px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer'
+            ]"
+          >
+            <span>🌐</span>
+            <span>{{ currentLang === 'es' ? 'ES' : 'EN' }}</span>
+          </button>
+        </div>
+
+        <!-- Selectores de Configuración -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 items-end">
+          <div>
+            <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
+              {{ t?.toneLabel || 'Tono Editorial' }}
+            </label>
+            <select 
+              v-model="selectedTone"
+              :class="[
+                isDark ? 'bg-[#0e0e12] border-[#2c2c3a] text-neutral-100' : 'bg-neutral-50 border-neutral-300 text-neutral-900',
+                'w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#ff0000] h-10'
+              ]"
+            >
+              <option v-for="item in toneOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
+              {{ t?.audienceLabel || 'Audiencia Objetivo' }}
+            </label>
+            <select 
+              v-model="selectedAudience"
+              :class="[
+                isDark ? 'bg-[#0e0e12] border-[#2c2c3a] text-neutral-100' : 'bg-neutral-50 border-neutral-300 text-neutral-900',
+                'w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#ff0000] h-10'
+              ]"
+            >
+              <option v-for="item in audienceOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+            </select>
+          </div>
+
+          <!-- Sliding Segmented Toggle -->
+          <div>
+            <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
+              {{ t?.languageLabel || 'Idioma de Salida' }}
+            </label>
+            <div 
+              :class="isDark ? 'bg-[#0e0e12] border-[#2c2c3a]' : 'bg-neutral-100 border-neutral-300'"
+              class="border rounded-xl p-0.5 flex items-center relative h-10 cursor-pointer select-none"
+            >
+              <div 
+                class="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-[#ff0000] rounded-lg shadow-md transition-all duration-300 ease-out"
+                :class="selectedLanguage === 'Español' ? 'left-0.5' : 'left-[calc(50%+1px)]'"
+              ></div>
+
+              <button
+                type="button"
+                @click="selectedLanguage = 'Español'"
+                class="flex-1 text-center text-xs font-bold relative z-10 transition-colors py-1.5 cursor-pointer"
+                :class="selectedLanguage === 'Español' ? 'text-white' : (isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-600')"
+              >
+                {{ currentLang === 'es' ? 'Español' : 'Spanish' }}
+              </button>
+
+              <button
+                type="button"
+                @click="selectedLanguage = 'Inglés'"
+                class="flex-1 text-center text-xs font-bold relative z-10 transition-colors py-1.5 cursor-pointer"
+                :class="selectedLanguage === 'Inglés' ? 'text-white' : (isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-600')"
+              >
+                {{ currentLang === 'es' ? 'Inglés' : 'English' }}
+              </button>
+            </div>
           </div>
         </div>
-        
+
+        <!-- Input de Premisa -->
+        <div class="space-y-4">
+          <textarea
+            v-model="inputPrompt"
+            rows="4"
+            :placeholder="t?.placeholder || 'Write your core premise...'"
+            :class="[
+              isDark 
+                ? 'bg-[#0e0e12] border-[#2c2c3a] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
+                : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-[#ff0000]',
+              'w-full border rounded-2xl p-4 text-xs focus:outline-none resize-none transition-colors leading-relaxed font-sans'
+            ]"
+          ></textarea>
+
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <span :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-xs">
+              {{ t?.helperText || 'Genera 5 variantes simultáneas o regenera tarjetas individualmente.' }}
+            </span>
+
+            <button
+              @click="() => handleGenerate(false)"
+              :disabled="isGenerating || !inputPrompt.trim()"
+              class="bg-[#ff0000] hover:bg-[#d90000] disabled:bg-neutral-800 text-white font-bold text-xs px-6 py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer disabled:cursor-not-allowed"
+            >
+              <svg v-if="isGenerating" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span v-else>⚡</span>
+              <span>{{ isGenerating ? (t?.generatingBtn || 'Procesando...') : (t?.generateBtn || 'Generar Variantes') }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTADO 2: HILO DE CONVERSACIÓN TIPO CHATBOT -->
+    <div v-else class="flex-1 flex flex-col justify-between py-4 overflow-hidden">
+      
+      <!-- Barra Superior del Chat Activo -->
+      <div 
+        :class="isDark ? 'bg-[#141418] border-[#262633]' : 'bg-white border-neutral-200 shadow-sm'"
+        class="border rounded-2xl p-3 px-5 mb-4 flex items-center justify-between shrink-0"
+      >
         <div class="flex items-center gap-3">
-          <!-- BOTÓN DISPARADOR DE FLUJO 3 (PROGRAMACIÓN OMNICANAL) -->
+          <button
+            @click="startNewChat"
+            :class="isDark ? 'bg-[#1f1f28] hover:bg-[#282836] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'"
+            class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-neutral-700/30"
+          >
+            <span>➕</span>
+            <span>{{ currentLang === 'es' ? 'Nuevo Chat' : 'New Chat' }}</span>
+          </button>
+          <span class="text-xs opacity-50 font-mono">{{ activeSession.timestamp }}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Exportar -->
+          <div class="relative">
+            <button
+              @click="showExportDropdown = !showExportDropdown"
+              :class="isDark ? 'bg-[#1e1e26] border-[#333342] text-neutral-200' : 'bg-neutral-100 border-neutral-300 text-neutral-800'"
+              class="border px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>📥</span>
+              <span>{{ t?.exportBtn || 'Exportar' }}</span>
+              <span class="text-[9px] opacity-60">▼</span>
+            </button>
+
+            <div 
+              v-if="showExportDropdown"
+              :class="isDark ? 'bg-[#1e1e26] border-[#38384a] text-neutral-200 shadow-2xl' : 'bg-white border-neutral-200 text-neutral-800 shadow-xl'"
+              class="absolute right-0 mt-1.5 w-40 border rounded-xl p-1 z-40 space-y-0.5"
+            >
+              <button @click="exportContent('md')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
+                <span>📝</span> Markdown (.md)
+              </button>
+              <button @click="exportContent('json')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
+                <span>📦</span> JSON (.json)
+              </button>
+              <button @click="exportContent('txt')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
+                <span>📄</span> Text (.txt)
+              </button>
+            </div>
+          </div>
+
+          <!-- Botón Programar Aprobados -->
           <button
             v-if="approvedCount > 0"
             @click="scheduleApproved"
             :disabled="isSyncing"
-            class="bg-emerald-600 hover:bg-emerald-500 disabled:bg-neutral-600 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
           >
-            <svg v-if="isSyncing" class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span v-else>📅</span>
-            <span>{{ isSyncing ? 'Sincronizando...' : `Programar ${approvedCount} Aprobados` }}</span>
+            <span>📅</span>
+            <span>{{ isSyncing ? (t?.schedulingBtn || 'Sincronizando...') : `${t?.scheduleBtn || 'Programar'} (${approvedCount})` }}</span>
           </button>
+        </div>
+      </div>
 
-          <!-- Contador de Aprobados -->
-          <div :class="isDark ? 'bg-[#222222] border-[#303030]' : 'bg-neutral-100 border-neutral-200'" class="border px-3 py-1.5 rounded-lg text-[11px] font-medium flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span :class="isDark ? 'text-neutral-300' : 'text-neutral-700'">{{ approvedCount }} / {{ variants.length }} Aprobados</span>
+      <!-- Área de Respuestas Conversacionales -->
+      <div class="flex-1 overflow-y-auto space-y-6 pr-2 mb-4 scrollbar-thin">
+        
+        <!-- Mensaje del Usuario (Burbuja completa y expandible) -->
+        <div class="flex justify-end items-start gap-3 w-full">
+          <div 
+            :class="isDark ? 'bg-[#1f1f28] text-white border-[#313142]' : 'bg-neutral-900 text-white border-neutral-800'"
+            class="w-full max-w-full md:max-w-3xl border p-4.5 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-md font-sans whitespace-pre-wrap wrap-break-word "
+          >
+            <div class="text-[10px] font-bold text-[#ff2b2b] uppercase mb-1 tracking-wider">
+              {{ currentLang === 'es' ? 'PREMISA / PROMPT' : 'PREMISE / PROMPT' }}
+            </div>
+            {{ activeSession.prompt }}
+          </div>
+          <div class="w-7 h-7 rounded-full bg-neutral-700 text-white flex items-center justify-center text-xs shrink-0 font-bold shadow">
+            👤
+          </div>
+        </div>
+
+        <!-- Respuesta del Asistente OmniStudio -->
+        <div class="flex items-start gap-3.5">
+          <div class="w-7 h-7 rounded-full bg-[#ff0000] text-white flex items-center justify-center text-xs shrink-0 font-bold shadow-md">
+            ▶
+          </div>
+
+          <div class="flex-1 space-y-4">
+            <div 
+              v-for="variant in activeSession.variants"
+              :key="variant.id"
+              :class="[
+                isDark ? 'bg-[#141418] border-[#262633] shadow-md' : 'bg-white border-neutral-200 shadow-sm',
+                'border rounded-2xl p-4 md:p-5 space-y-3 transition-all'
+              ]"
+            >
+              <!-- Cabecera de la respuesta -->
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span :class="[getFormatBadgeStyle(variant.format), 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider']">
+                    {{ getTranslatedFormatName(variant.format) }}
+                  </span>
+                  <span :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-[11px]">
+                    {{ variant.durationOrLength }}
+                  </span>
+                  <span :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-[11px] font-medium">
+                    · {{ variant.tag }}
+                  </span>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                  <!-- Botón Regenerar individual -->
+                  <button 
+                    @click="regenerateSingleVariant(variant)" 
+                    :disabled="regeneratingId === variant.id"
+                    :title="t?.regenerateTitle || 'Regenerar'"
+                    :class="[
+                      isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700',
+                      'px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50'
+                    ]"
+                  >
+                    <svg 
+                      class="w-3 h-3" 
+                      :class="{ 'animate-spin': regeneratingId === variant.id }" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>{{ regeneratingId === variant.id ? (currentLang === 'es' ? 'Regenerando...' : 'Regenerating...') : (currentLang === 'es' ? 'Regenerar' : 'Regenerate') }}</span>
+                  </button>
+
+                  <button 
+                    @click="copyToClipboard(variant.content)" 
+                    :class="isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'"
+                    class="px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
+                  >
+                    📋 {{ currentLang === 'es' ? 'Copiar' : 'Copy' }}
+                  </button>
+                  <button 
+                    @click="openEditModal(variant)" 
+                    :class="isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'"
+                    class="px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
+                  >
+                    ✏️ {{ t?.editBtn || 'Editar' }}
+                  </button>
+                  <button 
+                    @click="toggleApproval(variant.id)" 
+                    :class="variant.isApproved ? 'bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 font-bold' : (isDark ? 'bg-[#1e1e26] text-neutral-400' : 'bg-neutral-100 text-neutral-700')"
+                    class="px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
+                  >
+                    {{ variant.isApproved ? (currentLang === 'es' ? '✓ Aprobado' : '✓ Approved') : (currentLang === 'es' ? 'Aprobar' : 'Approve') }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Título & Contenido de la Respuesta -->
+              <h3 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-sm font-bold leading-snug">
+                {{ variant.title }}
+              </h3>
+
+              <div 
+                :class="isDark ? 'bg-[#0e0e12] border-[#22222d] text-neutral-200' : 'bg-neutral-50 border-neutral-200 text-neutral-800'"
+                class="border rounded-xl p-3.5 text-xs leading-relaxed whitespace-pre-line font-sans"
+              >
+                {{ variant.content }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Notificaciones de estado de la sincronización -->
-      <div v-if="syncSuccessMessage" class="mb-3 px-3.5 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2">
-        <span>✓</span> {{ syncSuccessMessage }}
-      </div>
-      <div v-if="syncErrorMessage" class="mb-3 px-3.5 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
-        <span>⚠️</span> {{ syncErrorMessage }}
-      </div>
-
-      <div class="space-y-3">
+      <!-- Barra de Input Flotante Inferior -->
+      <div 
+        :class="isDark ? 'bg-[#141418] border-[#292936] shadow-2xl' : 'bg-white border-neutral-200 shadow-xl'"
+        class="border rounded-2xl p-2.5 px-3.5 flex items-center gap-3 shrink-0"
+      >
         <textarea
-          v-model="inputPrompt"
-          rows="3"
-          placeholder="Escribe aquí tu premisa o noticia (ej. Lanzamiento de un motor de IA que automatiza guiones y posts)..."
+          v-model="followUpPrompt"
+          rows="1"
+          @keydown.enter.exact.prevent="() => handleGenerate(true)"
+          :placeholder="currentLang === 'es' ? 'Escribe otra premisa o instrucción para reescribir variantes...' : 'Type another premise or refinement instruction...'"
           :class="[
-            isDark 
-              ? 'bg-[#0f0f0f] border-[#303030] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
-              : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-[#ff0000]',
-            'w-full border rounded-xl p-4 text-xs focus:outline-none resize-none transition-colors'
+            isDark ? 'bg-transparent text-white placeholder-neutral-500' : 'bg-transparent text-neutral-900 placeholder-neutral-400',
+            'w-full text-xs focus:outline-none resize-none'
           ]"
         ></textarea>
 
-        <div class="flex items-center justify-between pt-1">
-          <span :class="isDark ? 'text-neutral-500' : 'text-neutral-400'" class="text-[11px]">
-            Filtra en tiempo real o presiona <strong>Generar Variantes</strong>.
-          </span>
-
-          <button
-            @click="generateVariants"
-            :disabled="isGenerating || !inputPrompt.trim()"
-            class="bg-[#ff0000] hover:bg-[#cc0000] disabled:bg-neutral-600 text-white font-semibold text-xs px-6 py-2.5 rounded-full transition-all duration-200 flex items-center gap-2 shadow-md cursor-pointer disabled:cursor-not-allowed"
-          >
-            <svg v-if="isGenerating" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span v-else>⚡</span>
-            <span>{{ isGenerating ? 'Procesando en n8n...' : 'Generar Variantes Omnicanal' }}</span>
-          </button>
-        </div>
+        <button
+          @click="() => handleGenerate(true)"
+          :disabled="isGenerating || !followUpPrompt.trim()"
+          class="bg-[#ff0000] hover:bg-[#d90000] disabled:bg-neutral-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 shadow-md cursor-pointer shrink-0 disabled:cursor-not-allowed"
+        >
+          <svg v-if="isGenerating" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span v-else>⚡</span>
+          <span>{{ isGenerating ? (currentLang === 'es' ? 'Generando...' : 'Generating...') : (currentLang === 'es' ? 'Enviar' : 'Send') }}</span>
+        </button>
       </div>
     </div>
 
-    <!-- SECCIÓN 2: BARRA DE FILTROS -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-      <button
-        v-for="filter in filterOptions"
-        :key="filter"
-        @click="selectedFilter = filter"
-        :class="[
-          selectedFilter === filter
-            ? (isDark ? 'bg-white text-black font-semibold shadow' : 'bg-neutral-900 text-white font-semibold')
-            : (isDark ? 'bg-[#1e1e1e] text-neutral-300 hover:bg-[#2a2a2a] border border-[#2d2d2d]' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border border-neutral-200'),
-          'px-4 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap'
-        ]"
-      >
-        {{ filter }}
-      </button>
-    </div>
-
-    <!-- SECCIÓN 3: REJILLA DE TARJETAS DE CONTENIDO -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div
-        v-for="variant in filteredVariants"
-        :key="variant.id"
-        :class="[
-          isDark ? 'bg-[#181818] border-[#272727] hover:border-[#383838]' : 'bg-white border-neutral-200 hover:border-neutral-300 shadow-sm',
-          'border rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 relative group'
-        ]"
-      >
-        <div class="space-y-3">
-          <!-- Cabecera de la Tarjeta -->
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span :class="[getFormatBadgeStyle(variant.format), 'px-2.5 py-0.5 rounded text-[11px] font-semibold tracking-wide uppercase']">
-                {{ variant.format }}
-              </span>
-              <span :class="isDark ? 'text-neutral-500' : 'text-neutral-400'" class="text-[11px]">
-                {{ variant.durationOrLength }}
-              </span>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <span 
-                v-if="variant.isApproved"
-                class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium px-2 py-0.5 rounded flex items-center gap-1"
-              >
-                ✓ Aprobado
-              </span>
-              <span :class="isDark ? 'text-neutral-500' : 'text-neutral-400'" class="text-[11px] font-medium">
-                {{ variant.tag }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Título -->
-          <h3 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-sm font-semibold leading-snug">
-            {{ variant.title }}
-          </h3>
-
-          <!-- Vista previa del contenido -->
-          <p :class="isDark ? 'text-neutral-300' : 'text-neutral-600'" class="text-xs leading-relaxed line-clamp-4 whitespace-pre-line font-sans">
-            {{ variant.content }}
-          </p>
-        </div>
-
-        <!-- Acciones Inferiores -->
-        <div class="flex items-center justify-between pt-4 mt-4 border-t" :class="isDark ? 'border-[#222222]' : 'border-neutral-100'">
-          <button
-            @click="openEditModal(variant)"
-            :class="[
-              isDark ? 'bg-[#222222] text-neutral-300 hover:bg-[#2e2e2e] hover:text-white border-[#303030]' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border-neutral-200',
-              'border px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer'
-            ]"
-          >
-            <span>✏️</span>
-            <span>Editar</span>
-          </button>
-
-          <button
-            @click="toggleApproval(variant.id)"
-            :class="[
-              variant.isApproved
-                ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30'
-                : (isDark ? 'bg-[#222222] text-neutral-300 hover:bg-[#2c2c2c] border border-[#303030]' : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200 border border-neutral-200'),
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer'
-            ]"
-          >
-            {{ variant.isApproved ? 'Desaprobar' : 'Aprobar para Publicar' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SECCIÓN 4: ESTADO VACÍO -->
-    <div 
-      v-if="filteredVariants.length === 0" 
-      :class="isDark ? 'text-neutral-500 border-[#222222]' : 'text-neutral-400 border-neutral-200'"
-      class="text-center py-16 border rounded-2xl"
-    >
-      <p class="text-sm font-semibold">No se encontraron variantes coincidentes</p>
-      <p class="text-xs mt-1">Selecciona la categoría "Todos" para visualizarlas.</p>
-    </div>
-
-    <!-- MODAL DE EDICIÓN FLUIDO Y ANIMADO -->
+    <!-- MODAL DE EDICIÓN FLUIDO -->
     <Transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-150 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-100 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
     >
       <div 
-        v-if="editingVariant"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-        @click.self="closeEditModal"
+        v-if="activeEditingVariant"
+        class="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        @click.self="activeEditingVariant = null"
       >
-        <Transition
-          enter-active-class="transition duration-200 ease-out transform"
-          enter-from-class="opacity-0 scale-95 translate-y-4"
-          enter-to-class="opacity-100 scale-100 translate-y-0"
-          leave-active-class="transition duration-150 ease-in transform"
-          leave-from-class="opacity-100 scale-100 translate-y-0"
-          leave-to-class="opacity-0 scale-95 translate-y-4"
-        >
-          <div 
-            :class="[
-              isDark ? 'bg-[#181818] border-[#2d2d2d]' : 'bg-white border-neutral-200 shadow-2xl',
-              'border rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]'
-            ]"
-          >
-            <!-- Cabecera del Modal -->
-            <div class="px-6 py-4 border-b flex items-center justify-between" :class="isDark ? 'border-[#272727]' : 'border-neutral-200'">
-              <div class="flex items-center gap-2">
-                <span :class="[getFormatBadgeStyle(editingVariant.format), 'px-2.5 py-0.5 rounded text-[11px] font-semibold uppercase']">
-                  {{ editingVariant.format }}
-                </span>
-                <span :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-sm font-bold">
-                  Editor de Pieza Omnicanal
-                </span>
-              </div>
-              <button 
-                @click="closeEditModal"
-                :class="isDark ? 'text-neutral-400 hover:text-white' : 'text-neutral-500 hover:text-black'"
-                class="p-1 rounded-lg text-sm font-bold transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+        <div :class="isDark ? 'bg-[#18181f] border-[#383848] text-white' : 'bg-white border-neutral-300 text-neutral-900'" class="border rounded-2xl p-6 w-full max-w-xl space-y-4 shadow-2xl">
+          <h3 class="text-sm font-bold flex items-center gap-2">
+            <span>✏️</span> {{ t?.modalTitle || 'Editor' }}
+          </h3>
 
-            <!-- Cuerpo del Editor -->
-            <div class="p-6 space-y-4 overflow-y-auto flex-1">
-              <div>
-                <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="block text-xs font-semibold mb-1">
-                  Título / Gancho Principal
-                </label>
-                <input 
-                  v-model="tempEditTitle"
-                  type="text"
-                  :class="[
-                    isDark 
-                      ? 'bg-[#0f0f0f] border-[#303030] text-white focus:border-[#ff0000]' 
-                      : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
-                    'w-full border rounded-xl px-4 py-2.5 text-xs font-semibold focus:outline-none transition-colors'
-                  ]"
-                />
-              </div>
-
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="text-xs font-semibold">
-                    Cuerpo del Contenido / Guion
-                  </label>
-                  <span :class="isDark ? 'text-neutral-500' : 'text-neutral-400'" class="text-[11px]">
-                    {{ editWordsCount }} palabras · {{ editCharCount }} caracteres
-                  </span>
-                </div>
-                <textarea
-                  v-model="tempEditContent"
-                  rows="9"
-                  :class="[
-                    isDark 
-                      ? 'bg-[#0f0f0f] border-[#303030] text-white focus:border-[#ff0000]' 
-                      : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
-                    'w-full border rounded-xl p-4 text-xs leading-relaxed focus:outline-none font-sans transition-colors'
-                  ]"
-                ></textarea>
-              </div>
-            </div>
-
-            <!-- Pie del Modal -->
-            <div class="px-6 py-4 border-t flex items-center justify-end gap-3" :class="isDark ? 'border-[#272727] bg-[#141414]' : 'border-neutral-200 bg-neutral-50'">
-              <button
-                @click="closeEditModal"
-                :class="[
-                  isDark ? 'bg-[#222222] text-neutral-300 hover:bg-[#2c2c2c] border-[#303030]' : 'bg-white text-neutral-700 hover:bg-neutral-100 border-neutral-300',
-                  'border px-4 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer'
-                ]"
-              >
-                Descartar Cambios
-              </button>
-
-              <button
-                @click="saveEdit"
-                class="bg-[#ff0000] hover:bg-[#cc0000] text-white px-5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-md"
-              >
-                Guardar Edición
-              </button>
-            </div>
+          <div>
+            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputTitleLabel || 'Título' }}</label>
+            <input v-model="tempEditTitle" type="text" :class="isDark ? 'bg-[#0f0f13] border-[#2c2c3a] text-white' : 'bg-neutral-50 border-neutral-300 text-black'" class="w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#ff0000]" />
           </div>
-        </Transition>
+
+          <div>
+            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputContentLabel || 'Contenido' }}</label>
+            <textarea v-model="tempEditContent" rows="7" :class="isDark ? 'bg-[#0f0f13] border-[#2c2c3a] text-white' : 'bg-neutral-50 border-neutral-300 text-black'" class="w-full border rounded-xl p-3 text-xs leading-relaxed focus:outline-none font-sans"></textarea>
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <button @click="activeEditingVariant = null" :class="isDark ? 'bg-[#22222a] text-neutral-300' : 'bg-neutral-100 text-neutral-700'" class="px-4 py-1.5 rounded-xl text-xs font-semibold cursor-pointer">
+              {{ t?.discardBtn || 'Descartar' }}
+            </button>
+            <button @click="saveEdit" class="bg-[#ff0000] hover:bg-[#d90000] text-white px-4 py-1.5 rounded-xl text-xs font-bold cursor-pointer">
+              {{ t?.saveBtn || 'Guardar' }}
+            </button>
+          </div>
+        </div>
       </div>
     </Transition>
 

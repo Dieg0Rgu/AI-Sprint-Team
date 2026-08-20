@@ -1,193 +1,175 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import Swal from 'sweetalert2'
+import { useLanguage } from '../composables/useLanguage'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
-    searchQuery?: string
     isDark?: boolean
   }>(),
   {
-    searchQuery: '',
     isDark: true
   }
 )
 
-// URL del Webhook en n8n Cloud para contacto
+const { currentLang, t } = useLanguage()
+
 const N8N_CONTACT_URL = 'https://devaidiego.app.n8n.cloud/webhook/contactrequest'
 
-const formData = ref({
+const form = ref({
   name: '',
   email: '',
-  channelType: 'YouTube Studio API',
+  channel: 'YouTube Studio / Shorts Hub',
   message: ''
 })
 
-const isSubmitting = ref(false)
-const isSubmitted = ref(false)
-const errorMessage = ref('')
+const isSending = ref(false)
 
-const handleSubmit = async () => {
-  if (!formData.value.name.trim() || !formData.value.email.trim() || isSubmitting.value) return
-
-  isSubmitting.value = true
-  errorMessage.value = ''
+const submitForm = async () => {
+  if (!form.value.name || !form.value.message || isSending.value) return
+  isSending.value = true
 
   try {
-    const response = await fetch(N8N_CONTACT_URL, {
+    const res = await fetch(N8N_CONTACT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        name: formData.value.name.trim(),
-        email: formData.value.email.trim(),
-        channelType: formData.value.channelType,
-        message: formData.value.message.trim()
-      })
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(form.value)
     })
 
-    if (!response.ok) {
-      throw new Error(`Error en el servidor: ${response.status}`)
-    }
+    if (!res.ok) throw new Error('Error al despachar')
 
-    isSubmitted.value = true
-    formData.value = {
-      name: '',
-      email: '',
-      channelType: 'YouTube Studio API',
-      message: ''
-    }
+    // Alerta de éxito con SweetAlert2
+    await Swal.fire({
+      title: currentLang.value === 'es' ? '¡Notificación Enviada!' : 'Notification Sent!',
+      text: currentLang.value === 'es'
+        ? 'Tu solicitud ha sido distribuida por los canales automatizados de OmniStudio.'
+        : 'Your notification has been dispatched across all configured channels.',
+      icon: 'success',
+      background: props.isDark ? '#141414' : '#ffffff',
+      color: props.isDark ? '#ffffff' : '#111827',
+      confirmButtonColor: '#ff0000',
+      customClass: {
+        popup: 'rounded-2xl border border-neutral-800 shadow-2xl',
+        confirmButton: 'rounded-xl text-xs font-semibold px-5 py-2.5 shadow-md'
+      }
+    })
 
-    setTimeout(() => {
-      isSubmitted.value = false
-    }, 4500)
-  } catch (error) {
-    console.error('Error enviando formulario a n8n:', error)
-    errorMessage.value = 'No se pudo conectar con el servidor de automatización.'
+    form.value.message = ''
+  } catch (err) {
+    console.error(err)
+    Swal.fire({
+      title: 'Error',
+      text: currentLang.value === 'es'
+        ? 'No se pudo conectar con el webhook de n8n.'
+        : 'Failed to send notification. Verify n8n webhook.',
+      icon: 'error',
+      background: props.isDark ? '#141414' : '#ffffff',
+      color: props.isDark ? '#ffffff' : '#111827',
+      confirmButtonColor: '#ff0000'
+    })
   } finally {
-    isSubmitting.value = false
+    isSending.value = false
   }
 }
 </script>
 
 <template>
-  <div class="p-6 max-w-4xl mx-auto space-y-6">
-    <div :class="isDark ? 'border-[#272727]' : 'border-neutral-200'" class="border-b pb-4">
-      <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-2xl font-bold flex items-center gap-2">
+  <div class="px-6 py-6 md:px-10 max-w-4xl mx-auto space-y-6">
+    <div 
+      :class="isDark ? 'bg-[#141414] border-[#222222]' : 'bg-white border-neutral-200 shadow-sm'"
+      class="border rounded-2xl p-6 transition-colors"
+    >
+      <div class="flex items-center gap-2.5 mb-2">
         <span class="w-3 h-3 bg-[#ff0000] rounded-sm"></span>
-        Soporte de Inteligencia & API
-      </h1>
-      <p :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="text-xs mt-1">
-        Configura asistencia personalizada para conectar tus canales de publicación omnicanal.
+        <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-lg font-bold tracking-tight">
+          {{ t.contactTitle }}
+        </h1>
+      </div>
+      <p :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="text-xs">
+        {{ t.contactSubtitle }}
       </p>
     </div>
 
     <div 
-      :class="[
-        isDark ? 'bg-[#181818] border-[#272727]' : 'bg-white border-neutral-200 shadow-sm',
-        'border rounded-2xl p-6 transition-colors'
-      ]"
+      :class="isDark ? 'bg-[#141414] border-[#222222]' : 'bg-white border-neutral-200 shadow-sm'"
+      class="border rounded-2xl p-6 space-y-4"
     >
-      <form @submit.prevent="handleSubmit" class="space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="block text-xs font-semibold mb-1">
-              Nombre de Operador / Creador
-            </label>
-            <input 
-              v-model="formData.name"
-              type="text" 
-              required
-              placeholder="Ej. Ana Rodríguez"
-              :class="[
-                isDark 
-                  ? 'bg-[#0f0f0f] border-[#303030] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
-                  : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-[#ff0000]',
-                'w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none transition-colors'
-              ]"
-            />
-          </div>
-          <div>
-            <label :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="block text-xs font-semibold mb-1">
-              Correo Electrónico
-            </label>
-            <input 
-              v-model="formData.email"
-              type="email" 
-              required
-              placeholder="creador@estudio.com"
-              :class="[
-                isDark 
-                  ? 'bg-[#0f0f0f] border-[#303030] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
-                  : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-[#ff0000]',
-                'w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none transition-colors'
-              ]"
-            />
-          </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="block text-xs font-medium mb-1">
+            {{ t.formName }}
+          </label>
+          <input
+            v-model="form.name"
+            type="text"
+            :class="[
+              isDark ? 'bg-[#0a0a0a] border-[#292929] text-white focus:border-[#ff0000]' : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
+              'w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none transition-colors'
+            ]"
+          />
         </div>
 
         <div>
-          <label :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="block text-xs font-semibold mb-1">
-            Canal o Integración Principal
+          <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="block text-xs font-medium mb-1">
+            {{ t.formEmail }}
           </label>
-          <select 
-            v-model="formData.channelType"
+          <input
+            v-model="form.email"
+            type="email"
             :class="[
-              isDark 
-                ? 'bg-[#0f0f0f] border-[#303030] text-white focus:border-[#ff0000]' 
-                : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
-              'w-full border rounded-xl px-4 py-2.5 text-xs focus:outline-none transition-colors'
+              isDark ? 'bg-[#0a0a0a] border-[#292929] text-white focus:border-[#ff0000]' : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
+              'w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none transition-colors'
             ]"
-          >
-            <option value="YouTube Studio / Shorts Hub">YouTube Studio / Shorts Hub</option>
-            <option value="Twitter/X API Automation">Twitter/X API Automation</option>
-            <option value="Medium & Substack Direct Feed">Medium & Substack Direct Feed</option>
-            <option value="Spotify / Apple Podcasts RSS">Spotify / Apple Podcasts RSS</option>
-          </select>
+          />
         </div>
+      </div>
 
-        <div>
-          <label :class="isDark ? 'text-neutral-300' : 'text-neutral-700'" class="block text-xs font-semibold mb-1">
-            Requerimiento o Mensaje
-          </label>
-          <textarea
-            v-model="formData.message"
-            rows="4"
-            required
-            placeholder="Describe qué formatos adicionales necesitas programar..."
-            :class="[
-              isDark 
-                ? 'bg-[#0f0f0f] border-[#303030] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
-                : 'bg-neutral-50 border-neutral-300 text-neutral-900 placeholder-neutral-400 focus:border-[#ff0000]',
-              'w-full border rounded-xl p-4 text-xs focus:outline-none resize-none transition-colors'
-            ]"
-          ></textarea>
-        </div>
+      <div>
+        <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="block text-xs font-medium mb-1">
+          {{ t.formChannel }}
+        </label>
+        <select
+          v-model="form.channel"
+          :class="[
+            isDark ? 'bg-[#0a0a0a] border-[#292929] text-neutral-200' : 'bg-neutral-50 border-neutral-300 text-neutral-800',
+            'w-full border rounded-xl px-3 py-2 text-xs focus:outline-none transition-colors'
+          ]"
+        >
+          <option value="YouTube Studio / Shorts Hub">YouTube Studio / Shorts Hub</option>
+          <option value="Twitter/X API Automation">Twitter/X API Automation</option>
+          <option value="Medium & Substack Direct Feed">Medium & Substack Direct Feed</option>
+          <option value="Spotify / Apple Podcasts RSS">Spotify / Apple Podcasts RSS</option>
+        </select>
+      </div>
 
-        <div class="flex items-center justify-between pt-2">
-          <div>
-            <p v-if="isSubmitted" class="text-xs text-emerald-500 font-medium flex items-center gap-1.5">
-              <span>✓</span> Solicitud enviada correctamente a Discord, Telegram y Correo.
-            </p>
-            <p v-if="errorMessage" class="text-xs text-red-500 font-medium">
-              {{ errorMessage }}
-            </p>
-          </div>
+      <div>
+        <label :class="isDark ? 'text-neutral-400' : 'text-neutral-600'" class="block text-xs font-medium mb-1">
+          {{ t.formMessage }}
+        </label>
+        <textarea
+          v-model="form.message"
+          rows="4"
+          :class="[
+            isDark ? 'bg-[#0a0a0a] border-[#292929] text-white focus:border-[#ff0000]' : 'bg-neutral-50 border-neutral-300 text-neutral-900 focus:border-[#ff0000]',
+            'w-full border rounded-xl p-3.5 text-xs focus:outline-none transition-colors'
+          ]"
+        ></textarea>
+      </div>
 
-          <button 
-            type="submit" 
-            :disabled="isSubmitting"
-            class="bg-[#ff0000] hover:bg-[#cc0000] disabled:bg-neutral-500 text-white font-semibold text-xs px-6 py-2.5 rounded-full transition-colors cursor-pointer shadow-md flex items-center gap-2"
-          >
-            <svg v-if="isSubmitting" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-            </svg>
-            <span>{{ isSubmitting ? 'Despachando...' : 'Enviar Solicitud' }}</span>
-          </button>
-        </div>
-      </form>
+      <div class="flex justify-end pt-2">
+        <button
+          @click="submitForm"
+          :disabled="isSending || !form.name || !form.message"
+          class="bg-[#ff0000] hover:bg-[#cc0000] disabled:bg-neutral-700 text-white font-semibold text-xs px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-md"
+        >
+          <svg v-if="isSending" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span v-else>🚀</span>
+          <span>{{ isSending ? t.formSending : t.formSubmit }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>

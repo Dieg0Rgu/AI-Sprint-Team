@@ -13,7 +13,7 @@ withDefaults(
 )
 
 // URL del Webhook en n8n Cloud para contacto
-const N8N_CONTACT_URL = 'https://devaidiego.app.n8n.cloud/webhook-test/contactrequest'
+const N8N_CONTACT_URL = 'https://devaidiego.app.n8n.cloud/webhook/contactrequest'
 
 const formData = ref({
   name: '',

@@ -1,0 +1,498 @@
+{
+  "name": "Creative_Studio",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:5173"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        80
+      ],
+      "id": "17029652-8142-479e-904d-fad13814fbcb",
+      "name": "Webhook",
+      "webhookId": "39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        480,
+        80
+      ],
+      "id": "f2baf85d-2fc8-4c60-802c-b19ad9f094be",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.prompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=Eres un generador de contenido omnicanal para OmniStudio. Transforma la premisa del usuario en exactamente 5 variantes con formato JSON estricto: Hilos, Artículos, Boletines, Videos y Audios.  Debes responder ÚNICAMENTE un JSON válido con esta estructura exacta sin explicaciones adicionales: {   \"variants\": [     {       \"id\": \"1\",       \"format\": \"Hilos\",       \"title\": \"Título con gancho para X/Twitter\",       \"content\": \"1/5 Texto del hilo...\",       \"durationOrLength\": \"5 Tweets\",       \"tag\": \"X / Twitter\"     },     {       \"id\": \"2\",       \"format\": \"Artículos\",       \"title\": \"Título SEO para blog\",       \"content\": \"Texto del artículo...\",       \"durationOrLength\": \"950 palabras\",       \"tag\": \"Blog / Medium\"     },     {       \"id\": \"3\",       \"format\": \"Boletines\",       \"title\": \"Asunto del newsletter\",       \"content\": \"Texto del boletín...\",       \"durationOrLength\": \"Lectura 2 min\",       \"tag\": \"Substack\"     },     {       \"id\": \"4\",       \"format\": \"Videos\",       \"title\": \"Título de alto impacto\",       \"content\": \"[00:00 - GANCHO] Guión del video...\",       \"durationOrLength\": \"0:50 min\",       \"tag\": \"YouTube Shorts\"     },     {       \"id\": \"5\",       \"format\": \"Audios\",       \"title\": \"Pauta de podcast\",       \"content\": \"[Voz de locutor] Pauta de audio...\",       \"durationOrLength\": \"4:30 min\",       \"tag\": \"Audiograma\"     }   ] }"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -96,
+        -32
+      ],
+      "id": "5df25a79-a3c1-4924-a2cc-b5d8f3f1468e",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini",
+          "cachedResultName": "gpt-5-mini",
+          "cachedResultUrl": ""
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "d7d1ab3b-c6a4-4920-a147-e485b8d56de2",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "rLx2t30uRdi1doRu",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItem = $input.first().json;\n\n// 1. Obtener el texto en crudo generado por el LLM\nlet raw = inputItem.text || inputItem.response?.text || inputItem.message?.content || inputItem.output || '';\nif (typeof inputItem === 'object' && !raw) {\n  raw = JSON.stringify(inputItem);\n}\n\n// 2. Intentar parsear como JSON normal primero\nlet variantsMap = {};\n\ntry {\n  // Limpiar etiquetas markdown ```json ... ```\n  let clean = raw.replace(/```json/gi, '').replace(/```/g, '').trim();\n  const start = clean.indexOf('{');\n  const end = clean.lastIndexOf('}');\n  if (start !== -1 && end !== -1) {\n    clean = clean.substring(start, end + 1);\n  }\n  const parsed = JSON.parse(clean);\n  const arr = parsed.variants || (Array.isArray(parsed) ? parsed : []);\n  arr.forEach(item => {\n    if (item && item.format) {\n      variantsMap[item.format.toLowerCase()] = item;\n    }\n  });\n} catch (e) {\n  // Si falla el JSON.parse, extraemos los bloques mediante Regex\n}\n\n// 3. Formatos objetivo predeterminados\nconst formatConfigs = [\n  { key: 'hilo', format: 'Hilos', defaultTag: 'X / Twitter', defaultDuration: '5 Tweets' },\n  { key: 'art', format: 'Artículos', defaultTag: 'Blog / Medium', defaultDuration: '950 palabras' },\n  { key: 'bol', format: 'Boletines', defaultTag: 'Substack', defaultDuration: 'Lectura 2 min' },\n  { key: 'vid', format: 'Videos', defaultTag: 'YouTube Shorts', defaultDuration: '0:50 min' },\n  { key: 'aud', format: 'Audios', defaultTag: 'Audiograma', defaultDuration: '4:30 min' }\n];\n\n// 4. Extracción por Regex de respaldo si el JSON falló\nconst variants = formatConfigs.map((cfg, index) => {\n  // Buscar si se parseó correctamente\n  const foundKey = Object.keys(variantsMap).find(k => k.includes(cfg.key));\n  if (foundKey && variantsMap[foundKey]) {\n    const v = variantsMap[foundKey];\n    return {\n      id: String(v.id || `${Date.now()}-${index}`),\n      format: cfg.format,\n      title: String(v.title || `Variante ${cfg.format}`),\n      content: String(v.content || ''),\n      isApproved: false,\n      isEditing: false,\n      durationOrLength: String(v.durationOrLength || cfg.defaultDuration),\n      tag: String(v.tag || cfg.defaultTag)\n    };\n  }\n\n  // Extracción Regex del bloque específico dentro del texto crudo\n  // Busca patrones como: \"format\": \"Hilos\", ... \"title\": \"...\", \"content\": \"...\"\n  const blockRegex = new RegExp(`[\"']format[\"']\\\\s*:\\\\s*[\"'][^\"']*${cfg.key}[^\"']*[\"'][\\\\s\\\\S]*?(?=[\"']format[\"']|$)`, 'i');\n  const matchBlock = raw.match(blockRegex);\n  const blockText = matchBlock ? matchBlock[0] : '';\n\n  const titleMatch = blockText.match(/[\"']title[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n  const contentMatch = blockText.match(/[\"']content[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n  const tagMatch = blockText.match(/[\"']tag[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n  const durationMatch = blockText.match(/[\"']durationOrLength[\"']\\s*:\\s*[\"']([^\"']+)[\"']/i);\n\n  return {\n    id: `${Date.now()}-${index}`,\n    format: cfg.format,\n    title: titleMatch ? titleMatch[1] : `Variante para ${cfg.format}`,\n    content: contentMatch ? contentMatch[1].replace(/\\\\n/g, '\\n') : (blockText ? blockText.slice(0, 300) : 'Generando contenido optimizado...'),\n    isApproved: false,\n    isEditing: false,\n    durationOrLength: durationMatch ? durationMatch[1] : cfg.defaultDuration,\n    tag: tagMatch ? tagMatch[1] : cfg.defaultTag\n  };\n});\n\nreturn { variants };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        80
+      ],
+      "id": "29acc9f2-800a-419c-9d9e-079e14f9214b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contactrequest",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:5173"
+        }
+      },
+      "name": "Webhook Contacto",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        688
+      ],
+      "id": "90d59503-3f5c-4f71-b305-4bfe8ab281c8",
+      "webhookId": "0110cf75-f176-427d-9998-92589cd6b621"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Notificaciones despachadas con éxito.' }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, Accept"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "POST, OPTIONS"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Responder Frontend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        128,
+        400
+      ],
+      "id": "591ce064-e500-42df-bda0-7cfad021706b"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=🚨 *Nueva Solicitud OmniStudio*\n\n👤 *Operador:* {{ $json.name }} \n\n✉️ *Correo:* {{ $json.email }} \n\n📡 *Canal:* {{ $json.channel }}\n\n🕒 *Fecha:* {{ $json.timestamp }}\n\n💬 *Requerimiento:* {{ $json.message }}",
+        "options": {}
+      },
+      "name": "Alerta Discord",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        128,
+        592
+      ],
+      "id": "8446f620-0b2c-408a-ba78-d1e7e94a3248",
+      "webhookId": "96e687ca-536c-46bf-b3cf-3685f9d06110",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "tLJs5T4U545VAxYr",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "7223612485",
+        "text": "=🚨 *Nueva Solicitud OmniStudio*\n\n👤 *Operador:* {{ $json.name }} \n\n✉️ *Correo:* {{ $json.email }} \n\n📡 *Canal:* {{ $json.channel }}\n\n🕒 *Fecha:* {{ $json.timestamp }}\n\n💬 *Requerimiento:* {{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "name": "Alerta Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        128,
+        976
+      ],
+      "id": "ed59fe97-66b7-4f8d-8d1b-ccbce0d71970",
+      "webhookId": "aad78bfb-471a-4f95-bd37-438bacc23cf9",
+      "credentials": {
+        "telegramApi": {
+          "id": "08MLi5qXVLRGISAs",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "migueldazah7@gmail.com, diegorguez2007@gmail.com, andresblancocenteno2@gmail.com",
+        "subject": "Idea de nuestro usuario",
+        "message": "=<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Nueva Solicitud OmniStudio</title>\n  <style>\n    /* Estilos generales y reset */\n    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }\n    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }\n    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }\n    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }\n    \n    /* Responsive */\n    @media screen and (max-width: 600px) {\n      .email-container {\n        width: 100% !important;\n        padding: 10px !important;\n      }\n      .content-cell {\n        padding: 20px 15px !important;\n      }\n    }\n  </style>\n</head>\n<body style=\"margin: 0; padding: 0; background-color: #f4f6f9;\">\n\n  <!-- Preheader oculto (texto previo que aparece en la bandeja de entrada) -->\n  <div style=\"display: none; font-size: 1px; color: #f4f6f9; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;\">\n    Nueva solicitud de OmniStudio registrada por Miguel.\n  </div>\n\n  <!-- Contenedor Principal -->\n  <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color: #f4f6f9; padding: 30px 0;\">\n    <tr>\n      <td align=\"center\">\n        \n        <!-- Tarjeta de Contenido -->\n        <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" class=\"email-container\" style=\"max-width: 580px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb;\">\n          \n          <!-- Encabezado de Alerta -->\n          <tr>\n            <td style=\"background-color: #dc2626; padding: 18px 24px; text-align: left;\">\n              <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n                <tr>\n                  <td style=\"color: #ffffff; font-size: 18px; font-weight: 700; letter-spacing: 0.3px;\">\n                    🚨 Nueva Solicitud OmniStudio\n                  </td>\n                </tr>\n              </table>\n            </td>\n          </tr>\n\n          <!-- Cuerpo del Correo -->\n          <tr>\n            <td class=\"content-cell\" style=\"padding: 28px 24px; color: #374151;\">\n              \n              <!-- Tabla de Metadatos -->\n              <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"font-size: 14px; line-height: 1.6; border-collapse: collapse;\">\n                \n                <!-- Operador -->\n                <tr>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; width: 35%; color: #6b7280; font-weight: 600;\">\n                    👤 Operador\n                  </td>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #111827; font-weight: 500;\">\n                    {{ $json.name }}\n                  </td>\n                </tr>\n\n                <!-- Correo -->\n                <tr>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #6b7280; font-weight: 600;\">\n                    ✉️ Correo\n                  </td>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #111827;\">\n                    <a href=\"mailto:{{ $json.email }}\" style=\"color: #2563eb; text-decoration: none; font-weight: 500;\">{{ $json.email }}</a>\n                  </td>\n                </tr>\n\n                <!-- Canal / API -->\n                <tr>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #6b7280; font-weight: 600;\">\n                    📡 Canal / API\n                  </td>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #111827;\">\n                    <span style=\"background-color: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 600; border: 1px solid #dbeafe;\">\n                      {{ $json.channel }}\n                    </span>\n                  </td>\n                </tr>\n\n                <!-- Fecha -->\n                <tr>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #6b7280; font-weight: 600;\">\n                    🕒 Fecha\n                  </td>\n                  <td style=\"padding: 8px 0; border-bottom: 1px solid #f3f4f6; color: #374151;\">\n                    {{ $json.timestamp }}\n                  </td>\n                </tr>\n\n              </table>\n\n              <!-- Sección del Requerimiento -->\n              <div style=\"margin-top: 24px;\">\n                <div style=\"font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 8px;\">\n                  💬 Requerimiento:\n                </div>\n                <div style=\"background-color: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 6px 6px 0; padding: 12px 16px; color: #1e293b; font-size: 14px; line-height: 1.5; font-style: italic;\">\n                  {{ $json.message }}\n                </div>\n              </div>\n\n            </td>\n          </tr>\n\n          <!-- Footer -->\n          <tr>\n            <td style=\"background-color: #f9fafb; padding: 16px 24px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;\">\n              Notificación automática generada por <strong>OmniStudio</strong>.\n            </td>\n          </tr>\n\n        </table>\n\n      </td>\n    </tr>\n  </table>\n\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        784
+      ],
+      "id": "e2178f66-6bbf-4344-8eec-0bb6021f436f",
+      "name": "Send a message",
+      "webhookId": "82b67df5-25e8-46ba-af17-0019d67a9bc8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "oC3MJdQQken33atS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nreturn {\n  json: {\n    name: body.name || 'Sin nombre',\n    email: body.email || 'Sin email',\n    channel: body.channel || 'General',\n    message: body.message || 'Sin mensaje',\n    timestamp: new Date().toLocaleString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        688
+      ],
+      "id": "5612f3ec-0442-4b90-9852-66d4a011a061",
+      "name": "Detectador de Datos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.body?.approvedVariants || [];\n\nif (!items.length) {\n  throw new Error(\"No se recibieron variantes aprobadas.\");\n}\n\nconst now = new Date();\n\nreturn items.map((item, index) => {\n  // Programa cada publicación con 2 horas de diferencia\n  const startTime = new Date(now.getTime() + (index + 1) * 2 * 60 * 60 * 1000);\n  const endTime = new Date(startTime.getTime() + 30 * 60 * 1000); // 30 min duración\n\n  return {\n    json: {\n      id: item.id,\n      title: item.title,\n      content: item.content,\n      format: item.format,\n      tag: item.tag,\n      scheduled_start: startTime.toISOString(),\n      scheduled_end: endTime.toISOString(),\n      status: 'scheduled'\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        1392
+      ],
+      "id": "9144f677-8a9d-47c2-a061-134aae2581b3",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "tableId": "content_schedule",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "title",
+              "fieldValue": "=={{ $json.title }}"
+            },
+            {
+              "fieldId": "content",
+              "fieldValue": "=={{ $json.content }}"
+            },
+            {
+              "fieldId": "format",
+              "fieldValue": "=={{ $json.format }}"
+            },
+            {
+              "fieldId": "platform",
+              "fieldValue": "=={{ $json.tag }}"
+            },
+            {
+              "fieldId": "scheduled_at",
+              "fieldValue": "=={{ $json.scheduled_start }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "=={{ $json.status }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        128,
+        1200
+      ],
+      "id": "4340330a-4469-4607-b23a-5e7cc64cbc70",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "tA8n5OB7xybkvyTT",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"success\": true }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        128,
+        1392
+      ],
+      "id": "0f8ae771-6cb0-4d21-b963-85152f7b9680",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "c786d4516218dd78a9caec2014313c99f1556abbeebca418484982d85552aac1@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Creative_Studio"
+        },
+        "start": "={{ $json.scheduled_start }}",
+        "end": "={{ $json.scheduled_end }}",
+        "additionalFields": {
+          "description": "=📡 Plataforma: {{ $json.tag }}\n\n📊 Estado: {{ $json.status }}\n\n--- CONTENIDO / GUIÓN ---\n\n{{ $json.content }}",
+          "summary": "=[{{ $json.format }}] {{ $json.title }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        1584
+      ],
+      "id": "27dae15e-566d-49a7-8dde-360336fde9a0",
+      "name": "Create an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "YfBAaRV2Ad7r2eJO",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "schedule-approved",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:5173"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        1392
+      ],
+      "id": "66fb3b4e-11d8-464c-ac7f-0eae038dd591",
+      "name": "Schedule",
+      "webhookId": "a9d6207e-a85f-45ed-98c7-f19bd65dd5dc"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Contacto": {
+      "main": [
+        [
+          {
+            "node": "Detectador de Datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectador de Datos": {
+      "main": [
+        [
+          {
+            "node": "Alerta Discord",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Responder Frontend",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Alerta Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "362d7027-ea80-4dd1-a28e-1e2038a61fc1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "842c97be54ed516d58ed7d7b75500bffc7664899af7b165bbbf537a9d1a0d7b9"
+  },
+  "nodeGroups": [],
+  "id": "hNVUkT4JhZwjGnLP",
+  "tags": []
+}

@@ -25,13 +25,19 @@ const props = withDefaults(
   }
 )
 
-// URL de tu Webhook en n8n Cloud para generación
-// (Usa /webhook-test/ si haces pruebas manuales o /webhook/ con el workflow en "Publish")
-const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook-test/39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2'
+// URLs de los Webhooks en n8n Cloud
+const N8N_GENERATE_URL = 'https://devaidiego.app.n8n.cloud/webhook/39fb0e03-e85d-4fc2-8fd4-1b2bf00d18b2'
+const N8N_SCHEDULE_URL = 'https://devaidiego.app.n8n.cloud/webhook/schedule-approved'
+
 const inputPrompt = ref('')
 const selectedFilter = ref<'Todos' | ContentFormat>('Todos')
 const isGenerating = ref(false)
 const errorMessage = ref('')
+
+// Estado para el tercer flujo (Sincronización con Supabase y Calendar)
+const isSyncing = ref(false)
+const syncSuccessMessage = ref('')
+const syncErrorMessage = ref('')
 
 // Variantes base cargadas por defecto
 const variants = ref<VariantItem[]>([
@@ -115,6 +121,7 @@ const editWordsCount = computed(() => {
 const editCharCount = computed(() => {
   return tempEditContent.value.length
 })
+
 // Opciones para la barra de filtros
 const filterOptions: Array<'Todos' | ContentFormat> = [
   'Todos',
@@ -130,10 +137,7 @@ const filteredVariants = computed(() => {
   const query = (props.searchQuery || '').toLowerCase().trim()
 
   return variants.value.filter(v => {
-    // Filtro por categoría (Todos, Hilos, Artículos, etc.)
     const matchesCategory = selectedFilter.value === 'Todos' || v.format === selectedFilter.value
-
-    // Filtro por término de búsqueda (busca en título, contenido, tag o formato)
     const matchesSearch = !query || 
       v.title.toLowerCase().includes(query) ||
       v.content.toLowerCase().includes(query) ||
@@ -153,7 +157,7 @@ const toggleApproval = (id: string) => {
   }
 }
 
-// Generación con n8n
+// Generación con n8n (Flujo 1)
 const generateVariants = async () => {
   if (!inputPrompt.value.trim() || isGenerating.value) return
   isGenerating.value = true
@@ -197,9 +201,45 @@ const generateVariants = async () => {
     }
   } catch (error: any) {
     console.error('Error al generar con n8n:', error)
-    errorMessage.value = 'No se pudo conectar con el flujo de n8n. Verifica que esté activo.'
+    errorMessage.value = 'No se pudo conectar con el flujo de generación en n8n.'
   } finally {
     isGenerating.value = false
+  }
+}
+
+// Programación Omnicanal de Aprobados (Flujo 3: Supabase + Google Calendar)
+const scheduleApproved = async () => {
+  const approvedList = variants.value.filter(v => v.isApproved)
+  if (!approvedList.length || isSyncing.value) return
+
+  isSyncing.value = true
+  syncSuccessMessage.value = ''
+  syncErrorMessage.value = ''
+
+  try {
+    const res = await fetch(N8N_SCHEDULE_URL, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ approvedVariants: approvedList })
+    })
+
+    if (!res.ok) throw new Error(`Error en n8n: ${res.status}`)
+
+    syncSuccessMessage.value = `¡${approvedList.length} piezas agendadas en Calendar y guardadas en Supabase!`
+    setTimeout(() => {
+      syncSuccessMessage.value = ''
+    }, 4500)
+  } catch (err: any) {
+    console.error('Error al sincronizar con n8n:', err)
+    syncErrorMessage.value = 'Error al conectar con el flujo de agendamiento.'
+    setTimeout(() => {
+      syncErrorMessage.value = ''
+    }, 4500)
+  } finally {
+    isSyncing.value = false
   }
 }
 
@@ -246,11 +286,35 @@ const getFormatBadgeStyle = (format: ContentFormat) => {
         </div>
         
         <div class="flex items-center gap-3">
+          <!-- BOTÓN DISPARADOR DE FLUJO 3 (PROGRAMACIÓN OMNICANAL) -->
+          <button
+            v-if="approvedCount > 0"
+            @click="scheduleApproved"
+            :disabled="isSyncing"
+            class="bg-emerald-600 hover:bg-emerald-500 disabled:bg-neutral-600 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <svg v-if="isSyncing" class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span v-else>📅</span>
+            <span>{{ isSyncing ? 'Sincronizando...' : `Programar ${approvedCount} Aprobados` }}</span>
+          </button>
+
+          <!-- Contador de Aprobados -->
           <div :class="isDark ? 'bg-[#222222] border-[#303030]' : 'bg-neutral-100 border-neutral-200'" class="border px-3 py-1.5 rounded-lg text-[11px] font-medium flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span :class="isDark ? 'text-neutral-300' : 'text-neutral-700'">{{ approvedCount }} / {{ variants.length }} Aprobados</span>
           </div>
         </div>
+      </div>
+
+      <!-- Notificaciones de estado de la sincronización -->
+      <div v-if="syncSuccessMessage" class="mb-3 px-3.5 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl text-xs flex items-center gap-2">
+        <span>✓</span> {{ syncSuccessMessage }}
+      </div>
+      <div v-if="syncErrorMessage" class="mb-3 px-3.5 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs flex items-center gap-2">
+        <span>⚠️</span> {{ syncErrorMessage }}
       </div>
 
       <div class="space-y-3">
@@ -378,7 +442,7 @@ const getFormatBadgeStyle = (format: ContentFormat) => {
       </div>
     </div>
 
-    <!-- SECCIÓN 4: ESTADO VACÍO SI EL FILTRO NO ARROJA RESULTADOS -->
+    <!-- SECCIÓN 4: ESTADO VACÍO -->
     <div 
       v-if="filteredVariants.length === 0" 
       :class="isDark ? 'text-neutral-500 border-[#222222]' : 'text-neutral-400 border-neutral-200'"

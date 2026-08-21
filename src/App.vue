@@ -19,7 +19,8 @@ const searchQuery = ref('')
     />
 
     <div class="flex flex-1 overflow-hidden">
-      <SideBar :isDark="isDark" />
+      <!-- El sidebar recibe el texto buscado para filtrar en tiempo real -->
+      <SideBar :isDark="isDark" :searchQuery="searchQuery" />
 
       <div class="flex-1 flex flex-col justify-between overflow-y-auto bg-transparent">
         <main class="flex-1 w-full">

@@ -43,12 +43,10 @@ const isGenerating = ref(false)
 const regeneratingId = ref<string | null>(null)
 const isSyncing = ref(false)
 
-// Editor Modal para variantes
 const activeEditingVariant = ref<VariantItem | null>(null)
 const tempEditTitle = ref('')
 const tempEditContent = ref('')
 
-// Modal estándar con tema oscuro/claro
 const notify = (title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info') => {
   return Swal.fire({
     title,
@@ -64,7 +62,6 @@ const notify = (title: string, text: string, icon: 'success' | 'error' | 'warnin
   })
 }
 
-// Notificación Toast rápida para acciones menores (ej. copiar)
 const notifyToast = (title: string, icon: 'success' | 'info' = 'success') => {
   const Toast = Swal.mixin({
     toast: true,
@@ -95,9 +92,22 @@ const audienceOptions = computed(() => [
   { value: 'Audiencia General', label: t.value?.audiences?.general || 'Audiencia General' }
 ])
 
-// Sesión activa seleccionada desde el sidebar
 const activeSession = computed(() => {
   return historyList.value.find(s => s.id === activeSessionId.value) || null
+})
+
+// Variantes filtradas por el buscador superior
+const visibleVariants = computed(() => {
+  if (!activeSession.value?.variants) return []
+  const query = (props.searchQuery || '').toLowerCase().trim()
+  if (!query) return activeSession.value.variants
+
+  return activeSession.value.variants.filter(v => 
+    (v.title || '').toLowerCase().includes(query) ||
+    (v.content || '').toLowerCase().includes(query) ||
+    (v.tag || '').toLowerCase().includes(query) ||
+    (v.format || '').toLowerCase().includes(query)
+  )
 })
 
 const startNewChat = () => {
@@ -118,8 +128,8 @@ const toggleApproval = (variantId: string) => {
     item.isApproved = !item.isApproved
     notifyToast(
       item.isApproved 
-        ? (currentLang.value === 'es' ? 'Pieza marcada como aprobada' : 'Piece approved')
-        : (currentLang.value === 'es' ? 'Pieza desaprobada' : 'Piece disapproved'),
+        ? (currentLang.value === 'es' ? 'Pieza aprobada' : 'Piece approved')
+        : (currentLang.value === 'es' ? 'Pieza desaprobada' : 'Piece unapproved'),
       'info'
     )
   }
@@ -148,7 +158,6 @@ const copyToClipboard = (text: string) => {
   )
 }
 
-// Mapeo seguro protegido contra undefined
 const getTranslatedFormatName = (fmt?: string | ContentFormat) => {
   if (!fmt) return 'CONTENIDO'
   
@@ -192,7 +201,6 @@ const getFormatBadgeStyle = (format: ContentFormat) => {
   }
 }
 
-// Exportación
 const exportContent = (fileFormat: 'md' | 'json' | 'txt') => {
   showExportDropdown.value = false
   const targetVariants = activeSession.value?.variants || []
@@ -237,12 +245,11 @@ const exportContent = (fileFormat: 'md' | 'json' | 'txt') => {
   URL.revokeObjectURL(url)
 
   notifyToast(
-    currentLang.value === 'es' ? `Archivo ${fileFormat.toUpperCase()} descargado` : `File ${fileFormat.toUpperCase()} exported`,
+    currentLang.value === 'es' ? `Archivo exportado (.${fileFormat})` : `Exported file (.${fileFormat})`,
     'success'
   )
 }
 
-// Generación inicial o continuación dentro del mismo chat
 const handleGenerate = async (isFollowUp = false) => {
   const promptToSend = isFollowUp ? followUpPrompt.value.trim() : inputPrompt.value.trim()
   if (!promptToSend || isGenerating.value) return
@@ -288,8 +295,8 @@ const handleGenerate = async (isFollowUp = false) => {
         notify(
           currentLang.value === 'es' ? '¡Conversación Actualizada!' : 'Thread Updated!',
           currentLang.value === 'es'
-            ? 'Se han refinado y regenerado las variantes de esta sesión con éxito.'
-            : 'The variants in this session have been refined successfully.',
+            ? 'Se han refinado y actualizado las variantes en este chat.'
+            : 'Variants in this thread have been updated successfully.',
           'success'
         )
       } else {
@@ -312,7 +319,6 @@ const handleGenerate = async (isFollowUp = false) => {
   }
 }
 
-// Regeneración individual
 const regenerateSingleVariant = async (variant: VariantItem) => {
   if (regeneratingId.value || !activeSession.value) return
   regeneratingId.value = variant.id
@@ -375,7 +381,6 @@ const regenerateSingleVariant = async (variant: VariantItem) => {
   }
 }
 
-// Programar variantes
 const scheduleApproved = async () => {
   const approvedList = activeSession.value?.variants.filter(v => v.isApproved) || []
   if (!approvedList.length || isSyncing.value) return
@@ -421,7 +426,7 @@ const scheduleApproved = async () => {
           <div class="flex items-center gap-3">
             <span class="w-3.5 h-3.5 bg-[#ff0000] rounded-sm shadow-sm"></span>
             <h1 :class="isDark ? 'text-white' : 'text-neutral-900'" class="text-base font-bold tracking-tight">
-              {{ t?.headerTitle || 'Content Intelligence Hub' }}
+              {{ t?.headerTitle }}
             </h1>
           </div>
           
@@ -441,7 +446,7 @@ const scheduleApproved = async () => {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 items-end">
           <div>
             <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
-              {{ t?.toneLabel || 'Tono Editorial' }}
+              {{ t?.toneLabel }}
             </label>
             <select 
               v-model="selectedTone"
@@ -456,7 +461,7 @@ const scheduleApproved = async () => {
 
           <div>
             <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
-              {{ t?.audienceLabel || 'Audiencia Objetivo' }}
+              {{ t?.audienceLabel }}
             </label>
             <select 
               v-model="selectedAudience"
@@ -472,7 +477,7 @@ const scheduleApproved = async () => {
           <!-- Sliding Segmented Toggle -->
           <div>
             <label :class="isDark ? 'text-neutral-300 font-semibold' : 'text-neutral-700 font-semibold'" class="block text-xs mb-1">
-              {{ t?.languageLabel || 'Idioma de Salida' }}
+              {{ t?.languageLabel }}
             </label>
             <div 
               :class="isDark ? 'bg-[#0e0e12] border-[#2c2c3a]' : 'bg-neutral-100 border-neutral-300'"
@@ -509,7 +514,7 @@ const scheduleApproved = async () => {
           <textarea
             v-model="inputPrompt"
             rows="4"
-            :placeholder="t?.placeholder || 'Write your core premise...'"
+            :placeholder="t?.placeholder"
             :class="[
               isDark 
                 ? 'bg-[#0e0e12] border-[#2c2c3a] text-white placeholder-neutral-500 focus:border-[#ff0000]' 
@@ -520,7 +525,7 @@ const scheduleApproved = async () => {
 
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
             <span :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-xs">
-              {{ t?.helperText || 'Genera 5 variantes simultáneas o regenera tarjetas individualmente.' }}
+              {{ t?.helperText }}
             </span>
 
             <button
@@ -533,7 +538,7 @@ const scheduleApproved = async () => {
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
               </svg>
               <span v-else>⚡</span>
-              <span>{{ isGenerating ? (t?.generatingBtn || 'Procesando...') : (t?.generateBtn || 'Generar Variantes') }}</span>
+              <span>{{ isGenerating ? t?.generatingBtn : t?.generateBtn }}</span>
             </button>
           </div>
         </div>
@@ -555,7 +560,7 @@ const scheduleApproved = async () => {
             class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-neutral-700/30"
           >
             <span>➕</span>
-            <span>{{ currentLang === 'es' ? 'Nuevo Chat' : 'New Chat' }}</span>
+            <span>{{ t?.newChatBtn }}</span>
           </button>
           <span class="text-xs opacity-50 font-mono">{{ activeSession.timestamp }}</span>
         </div>
@@ -569,7 +574,7 @@ const scheduleApproved = async () => {
               class="border px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer"
             >
               <span>📥</span>
-              <span>{{ t?.exportBtn || 'Exportar' }}</span>
+              <span>{{ t?.exportBtn }}</span>
               <span class="text-[9px] opacity-60">▼</span>
             </button>
 
@@ -579,13 +584,13 @@ const scheduleApproved = async () => {
               class="absolute right-0 mt-1.5 w-40 border rounded-xl p-1 z-40 space-y-0.5"
             >
               <button @click="exportContent('md')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
-                <span>📝</span> Markdown (.md)
+                <span>📝</span> {{ t?.exportMd }}
               </button>
               <button @click="exportContent('json')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
-                <span>📦</span> JSON (.json)
+                <span>📦</span> {{ t?.exportJson }}
               </button>
               <button @click="exportContent('txt')" :class="isDark ? 'hover:bg-[#2a2a38]' : 'hover:bg-neutral-100'" class="w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer">
-                <span>📄</span> Text (.txt)
+                <span>📄</span> {{ t?.exportTxt }}
               </button>
             </div>
           </div>
@@ -598,7 +603,7 @@ const scheduleApproved = async () => {
             class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
           >
             <span>📅</span>
-            <span>{{ isSyncing ? (t?.schedulingBtn || 'Sincronizando...') : `${t?.scheduleBtn || 'Programar'} (${approvedCount})` }}</span>
+            <span>{{ isSyncing ? t?.schedulingBtn : `${t?.scheduleBtn} (${approvedCount})` }}</span>
           </button>
         </div>
       </div>
@@ -606,14 +611,14 @@ const scheduleApproved = async () => {
       <!-- Área de Respuestas Conversacionales -->
       <div class="flex-1 overflow-y-auto space-y-6 pr-2 mb-4 scrollbar-thin">
         
-        <!-- Mensaje del Usuario (Burbuja completa y expandible) -->
+        <!-- Mensaje del Usuario -->
         <div class="flex justify-end items-start gap-3 w-full">
           <div 
             :class="isDark ? 'bg-[#1f1f28] text-white border-[#313142]' : 'bg-neutral-900 text-white border-neutral-800'"
-            class="w-full max-w-full md:max-w-3xl border p-4.5 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-md font-sans whitespace-pre-wrap wrap-break-word "
+            class="w-full max-w-full md:max-w-3xl border p-4.5 rounded-2xl rounded-tr-sm text-xs leading-relaxed shadow-md font-sans whitespace-pre-wrap wrap-break-word"
           >
             <div class="text-[10px] font-bold text-[#ff2b2b] uppercase mb-1 tracking-wider">
-              {{ currentLang === 'es' ? 'PREMISA / PROMPT' : 'PREMISE / PROMPT' }}
+              {{ t?.premiseTag }}
             </div>
             {{ activeSession.prompt }}
           </div>
@@ -630,18 +635,17 @@ const scheduleApproved = async () => {
 
           <div class="flex-1 space-y-4">
             <div 
-              v-for="variant in activeSession.variants"
+              v-for="variant in visibleVariants"
               :key="variant.id"
               :class="[
                 isDark ? 'bg-[#141418] border-[#262633] shadow-md' : 'bg-white border-neutral-200 shadow-sm',
                 'border rounded-2xl p-4 md:p-5 space-y-3 transition-all'
               ]"
             >
-              <!-- Cabecera de la respuesta -->
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span :class="[getFormatBadgeStyle(variant.format), 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider']">
-                    {{ getTranslatedFormatName(variant.format) }}
+                    {{ getTranslatedFormatName(variant?.format) }}
                   </span>
                   <span :class="isDark ? 'text-neutral-400' : 'text-neutral-500'" class="text-[11px]">
                     {{ variant.durationOrLength }}
@@ -652,11 +656,10 @@ const scheduleApproved = async () => {
                 </div>
 
                 <div class="flex items-center gap-1.5">
-                  <!-- Botón Regenerar individual -->
+                  <!-- Botón Regenerar -->
                   <button 
                     @click="regenerateSingleVariant(variant)" 
                     :disabled="regeneratingId === variant.id"
-                    :title="t?.regenerateTitle || 'Regenerar'"
                     :class="[
                       isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700',
                       'px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50'
@@ -671,29 +674,34 @@ const scheduleApproved = async () => {
                     >
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
-                    <span>{{ regeneratingId === variant.id ? (currentLang === 'es' ? 'Regenerando...' : 'Regenerating...') : (currentLang === 'es' ? 'Regenerar' : 'Regenerate') }}</span>
+                    <span>{{ regeneratingId === variant.id ? t?.regeneratingBtn : t?.regenerateBtn }}</span>
                   </button>
 
+                  <!-- Botón Copiar -->
                   <button 
                     @click="copyToClipboard(variant.content)" 
                     :class="isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'"
                     class="px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
                   >
-                    📋 {{ currentLang === 'es' ? 'Copiar' : 'Copy' }}
+                    📋 {{ t?.copyBtn }}
                   </button>
+
+                  <!-- Botón Editar -->
                   <button 
                     @click="openEditModal(variant)" 
                     :class="isDark ? 'bg-[#1e1e26] hover:bg-[#282833] text-neutral-300' : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700'"
                     class="px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
                   >
-                    ✏️ {{ t?.editBtn || 'Editar' }}
+                    ✏️ {{ t?.editBtn }}
                   </button>
+
+                  <!-- Botón Aprobar -->
                   <button 
                     @click="toggleApproval(variant.id)" 
                     :class="variant.isApproved ? 'bg-emerald-600/25 text-emerald-300 border border-emerald-500/40 font-bold' : (isDark ? 'bg-[#1e1e26] text-neutral-400' : 'bg-neutral-100 text-neutral-700')"
                     class="px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer"
                   >
-                    {{ variant.isApproved ? (currentLang === 'es' ? '✓ Aprobado' : '✓ Approved') : (currentLang === 'es' ? 'Aprobar' : 'Approve') }}
+                    {{ variant.isApproved ? `✓ ${t?.approvedBadge}` : t?.approveBtn }}
                   </button>
                 </div>
               </div>
@@ -710,6 +718,14 @@ const scheduleApproved = async () => {
                 {{ variant.content }}
               </div>
             </div>
+
+            <!-- Estado si la búsqueda no arroja coincidencias dentro del chat -->
+            <div 
+              v-if="visibleVariants.length === 0" 
+              class="text-center py-10 opacity-50 text-xs italic"
+            >
+              {{ t?.historyEmpty }}
+            </div>
           </div>
         </div>
       </div>
@@ -723,7 +739,7 @@ const scheduleApproved = async () => {
           v-model="followUpPrompt"
           rows="1"
           @keydown.enter.exact.prevent="() => handleGenerate(true)"
-          :placeholder="currentLang === 'es' ? 'Escribe otra premisa o instrucción para reescribir variantes...' : 'Type another premise or refinement instruction...'"
+          :placeholder="t?.chatInputPlaceholder"
           :class="[
             isDark ? 'bg-transparent text-white placeholder-neutral-500' : 'bg-transparent text-neutral-900 placeholder-neutral-400',
             'w-full text-xs focus:outline-none resize-none'
@@ -740,7 +756,7 @@ const scheduleApproved = async () => {
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
           </svg>
           <span v-else>⚡</span>
-          <span>{{ isGenerating ? (currentLang === 'es' ? 'Generando...' : 'Generating...') : (currentLang === 'es' ? 'Enviar' : 'Send') }}</span>
+          <span>{{ isGenerating ? t?.generatingBtn : t?.sendBtn }}</span>
         </button>
       </div>
     </div>
@@ -761,25 +777,25 @@ const scheduleApproved = async () => {
       >
         <div :class="isDark ? 'bg-[#18181f] border-[#383848] text-white' : 'bg-white border-neutral-300 text-neutral-900'" class="border rounded-2xl p-6 w-full max-w-xl space-y-4 shadow-2xl">
           <h3 class="text-sm font-bold flex items-center gap-2">
-            <span>✏️</span> {{ t?.modalTitle || 'Editor' }}
+            <span>✏️</span> {{ t?.modalTitle }}
           </h3>
 
           <div>
-            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputTitleLabel || 'Título' }}</label>
+            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputTitleLabel }}</label>
             <input v-model="tempEditTitle" type="text" :class="isDark ? 'bg-[#0f0f13] border-[#2c2c3a] text-white' : 'bg-neutral-50 border-neutral-300 text-black'" class="w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#ff0000]" />
           </div>
 
           <div>
-            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputContentLabel || 'Contenido' }}</label>
+            <label class="block text-xs font-medium mb-1 opacity-75">{{ t?.inputContentLabel }}</label>
             <textarea v-model="tempEditContent" rows="7" :class="isDark ? 'bg-[#0f0f13] border-[#2c2c3a] text-white' : 'bg-neutral-50 border-neutral-300 text-black'" class="w-full border rounded-xl p-3 text-xs leading-relaxed focus:outline-none font-sans"></textarea>
           </div>
 
           <div class="flex justify-end gap-2 pt-2">
             <button @click="activeEditingVariant = null" :class="isDark ? 'bg-[#22222a] text-neutral-300' : 'bg-neutral-100 text-neutral-700'" class="px-4 py-1.5 rounded-xl text-xs font-semibold cursor-pointer">
-              {{ t?.discardBtn || 'Descartar' }}
+              {{ t?.discardBtn }}
             </button>
             <button @click="saveEdit" class="bg-[#ff0000] hover:bg-[#d90000] text-white px-4 py-1.5 rounded-xl text-xs font-bold cursor-pointer">
-              {{ t?.saveBtn || 'Guardar' }}
+              {{ t?.saveBtn }}
             </button>
           </div>
         </div>

@@ -1,12 +1,37 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useLanguage } from '../../composables/useLanguage'
 import { useHistory } from '../../composables/useHistory'
 
-defineProps<{ isDark: boolean }>()
+const props = withDefaults(
+  defineProps<{ 
+    isDark: boolean
+    searchQuery?: string
+  }>(),
+  {
+    searchQuery: ''
+  }
+)
 
 const { t } = useLanguage()
 const { historyList, activeSessionId, deleteSession } = useHistory()
+
+// Filtrado reactivo del historial en tiempo real al escribir en el buscador
+const filteredHistory = computed(() => {
+  const query = (props.searchQuery || '').toLowerCase().trim()
+  if (!query) return historyList.value
+
+  return historyList.value.filter(item => {
+    const matchPrompt = (item.prompt || '').toLowerCase().includes(query)
+    const matchVariants = (item.variants || []).some(v => 
+      (v.title || '').toLowerCase().includes(query) || 
+      (v.content || '').toLowerCase().includes(query) ||
+      (v.format || '').toLowerCase().includes(query)
+    )
+    return matchPrompt || matchVariants
+  })
+})
 </script>
 
 <template>
@@ -48,23 +73,27 @@ const { historyList, activeSessionId, deleteSession } = useHistory()
         </RouterLink>
       </nav>
 
-      <!-- Historial de Premisas Guardadas (Estilo Chat) -->
+      <!-- Historial de Premisas reactivo y traducido -->
       <div class="pt-3 border-t" :class="isDark ? 'border-[#26262f]' : 'border-neutral-200'">
         <div class="flex items-center justify-between px-1 mb-2">
-          <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Historial de Premisas</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 font-mono">{{ historyList.length }}</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">
+            {{ t.historyTitle }}
+          </span>
+          <span class="text-[10px] px-1.5 py-0.2 rounded bg-neutral-800 text-neutral-300 font-mono">
+            {{ filteredHistory.length }}
+          </span>
         </div>
 
-        <div class="space-y-1 max-h-[42vh] overflow-y-auto pr-1">
+        <div class="space-y-1 max-h-[44vh] overflow-y-auto pr-1 scrollbar-thin">
           <div 
-            v-if="historyList.length === 0" 
-            class="text-[11px] opacity-40 px-2 py-3 text-center italic"
+            v-if="filteredHistory.length === 0" 
+            class="text-[11px] opacity-40 px-2 py-4 text-center italic"
           >
-            No hay premisas previas
+            {{ t.historyEmpty }}
           </div>
 
           <div
-            v-for="item in historyList"
+            v-for="item in filteredHistory"
             :key="item.id"
             @click="activeSessionId = item.id"
             :class="[
@@ -81,8 +110,8 @@ const { historyList, activeSessionId, deleteSession } = useHistory()
 
             <button 
               @click.stop="deleteSession(item.id)" 
-              class="opacity-0 group-hover:opacity-100 hover:text-red-400 text-[10px] p-0.5 transition-opacity"
-              title="Eliminar"
+              class="opacity-0 group-hover:opacity-100 hover:text-red-400 text-[10px] p-0.5 transition-opacity cursor-pointer"
+              title="Delete"
             >
               ✕
             </button>
@@ -91,7 +120,7 @@ const { historyList, activeSessionId, deleteSession } = useHistory()
       </div>
     </div>
 
-    <!-- Indicador de Versión / Motor Activo -->
+    <!-- Indicador de Versión -->
     <div 
       :class="isDark ? 'bg-[#17171c] border-[#292936] text-neutral-300' : 'bg-neutral-100 border-neutral-200 text-neutral-700'"
       class="p-3 rounded-xl border text-[11px] shadow-sm"

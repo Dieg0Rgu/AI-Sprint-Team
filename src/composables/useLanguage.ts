@@ -14,27 +14,25 @@ export const useLanguage = () => {
   const t = computed(() => {
     if (currentLang.value === 'en') {
       return {
-        // Header & Sidebar
-        searchPlaceholder: 'Search by keyword in variants...',
+        // Layout & Sidebar
+        searchPlaceholder: 'Search by keyword in variants or history...',
         navStudio: 'Creative Studio',
         navEngines: 'Engines & Formats',
         navSupport: 'Support & API',
         pipelineVersion: 'Omni Pipeline v2.4',
         pipelineStatus: 'Active Engine',
         configuredVariants: '5 variants configured',
+        historyTitle: 'PREMISE HISTORY',
+        historyEmpty: 'No previous premises found',
+        newChatBtn: 'New Chat',
 
         // Footer
         footerCopyright: '© 2026 OmniStudio AI. High-performance omnichannel content generation.',
-        footerPrivacy: 'Privacy Policy',
-        footerTerms: 'Terms of Service',
         footerStatus: 'Systems Operational',
 
-        // HomeView
+        // Chat & Header
         headerTitle: 'Content Intelligence Hub',
         headerSubtitle: 'Configure tone, audience, and language to generate 5-channel AI variants.',
-        approvedCount: 'Approved',
-        scheduleBtn: 'Schedule',
-        schedulingBtn: 'Scheduling...',
         toneLabel: '🎭 Editorial Tone',
         audienceLabel: '🎯 Target Audience',
         languageLabel: '🌐 Output Language',
@@ -42,29 +40,31 @@ export const useLanguage = () => {
         helperText: 'Generate 5 variants at once or regenerate cards individually.',
         generateBtn: 'Generate Omnichannel Variants',
         generatingBtn: 'Processing in n8n...',
-        allFilter: 'All',
+        sendBtn: 'Send',
+        chatInputPlaceholder: 'Type another premise or refinement instruction...',
+        premiseTag: 'PREMISE / PROMPT',
+
+        // Actions & Buttons
         approvedBadge: 'Approved',
+        approveBtn: 'Approve',
+        unapproveBtn: 'Approved',
+        regenerateBtn: 'Regenerate',
+        regeneratingBtn: 'Regenerating...',
+        copyBtn: 'Copy',
         editBtn: 'Edit',
-        approveBtn: 'Approve for Publishing',
-        unapproveBtn: 'Disapprove',
-        emptyTitle: 'No matching variants found',
-        emptySubtitle: 'Select the "All" category to view your content.',
-        modalTitle: 'Omnichannel Content Editor',
-        inputTitleLabel: 'Headline / Main Hook',
-        inputContentLabel: 'Body Content / Script',
-        wordsText: 'words',
-        charsText: 'characters',
-        discardBtn: 'Discard Changes',
-        saveBtn: 'Save Changes',
+        scheduleBtn: 'Schedule',
+        schedulingBtn: 'Scheduling...',
         exportBtn: 'Export Content',
         exportMd: 'Markdown (.md)',
         exportJson: 'JSON (.json)',
-        exportTxt: 'Plain Text (.txt)',
-        regenerateTitle: 'Regenerate this variant only',
-        syncSuccess: 'pieces scheduled in Google Calendar & Supabase!',
-        syncError: 'Error connecting to scheduling workflow.',
+        exportTxt: 'Text (.txt)',
+        discardBtn: 'Discard',
+        saveBtn: 'Save',
+        modalTitle: 'Content Editor',
+        inputTitleLabel: 'Title',
+        inputContentLabel: 'Content',
 
-        // Select Options & Badges
+        // Select Options & Formats
         tones: {
           viral: 'Direct & Viral',
           b2b: 'Corporate B2B',
@@ -77,10 +77,6 @@ export const useLanguage = () => {
           execs: 'B2B Executives',
           general: 'General Audience'
         },
-        languages: {
-          es: 'Spanish',
-          en: 'English'
-        },
         formats: {
           all: 'All',
           threads: 'Threads',
@@ -90,7 +86,7 @@ export const useLanguage = () => {
           audios: 'Audios'
         },
 
-        // ServicesView (Motores & Formatos)
+        // Services & Contact
         servicesTitle: 'Omnichannel Engines & Formats',
         servicesSubtitle: 'Explore output channels and technical capabilities powered by our n8n cluster.',
         activeBadge: 'Active Pipeline',
@@ -99,8 +95,6 @@ export const useLanguage = () => {
         newslettersDesc: 'High-conversion editorial layouts formatted for Substack and Beehiiv.',
         videosDesc: 'Short-form visual scripts with timing markers for Reels and YouTube Shorts.',
         audiosDesc: 'Podcast and voiceover outlines structured for engaging audio retention.',
-
-        // ContactView (Soporte & API)
         contactTitle: 'Support & Webhook Hub',
         contactSubtitle: 'Send a direct inquiry or test omnichannel alerting (Discord, Telegram & Gmail).',
         formName: 'Your Name',
@@ -116,24 +110,22 @@ export const useLanguage = () => {
 
     // Español por defecto
     return {
-      searchPlaceholder: 'Buscar por palabras clave en variantes...',
+      searchPlaceholder: 'Buscar por palabras clave en variantes o historial...',
       navStudio: 'Estudio Creativo',
       navEngines: 'Motores & Formatos',
       navSupport: 'Soporte & API',
       pipelineVersion: 'Omni Pipeline v2.4',
       pipelineStatus: 'Motor Activo',
       configuredVariants: '5 variantes configuradas',
+      historyTitle: 'HISTORIAL DE PREMISAS',
+      historyEmpty: 'No se encontraron premisas previas',
+      newChatBtn: 'Nuevo Chat',
 
       footerCopyright: '© 2026 OmniStudio AI. Generación y atomización de contenido de alto rendimiento.',
-      footerPrivacy: 'Privacidad',
-      footerTerms: 'Términos de Servicio',
       footerStatus: 'Sistemas Operativos',
 
       headerTitle: 'Central de Inteligencia de Contenido',
       headerSubtitle: 'Configura tono, audiencia e idioma para estructurar tus variantes omnicanal con IA.',
-      approvedCount: 'Aprobados',
-      scheduleBtn: 'Programar',
-      schedulingBtn: 'Sincronizando...',
       toneLabel: '🎭 Tono Editorial',
       audienceLabel: '🎯 Audiencia Objetivo',
       languageLabel: '🌐 Idioma de Salida',
@@ -141,27 +133,28 @@ export const useLanguage = () => {
       helperText: 'Genera 5 variantes simultáneas o regenera tarjetas individualmente.',
       generateBtn: 'Generar Variantes Omnicanal',
       generatingBtn: 'Procesando en n8n...',
-      allFilter: 'Todos',
+      sendBtn: 'Enviar',
+      chatInputPlaceholder: 'Escribe otra premisa o instrucción para reescribir variantes...',
+      premiseTag: 'PREMISA / PROMPT',
+
       approvedBadge: 'Aprobado',
+      approveBtn: 'Aprobar',
+      unapproveBtn: 'Aprobado',
+      regenerateBtn: 'Regenerar',
+      regeneratingBtn: 'Regenerando...',
+      copyBtn: 'Copiar',
       editBtn: 'Editar',
-      approveBtn: 'Aprobar para Publicar',
-      unapproveBtn: 'Desaprobar',
-      emptyTitle: 'No se encontraron variantes coincidentes',
-      emptySubtitle: 'Selecciona la categoría "Todos" para visualizarlas.',
-      modalTitle: 'Editor de Pieza Omnicanal',
-      inputTitleLabel: 'Título / Gancho Principal',
-      inputContentLabel: 'Cuerpo del Contenido / Guion',
-      wordsText: 'palabras',
-      charsText: 'caracteres',
-      discardBtn: 'Descartar Cambios',
-      saveBtn: 'Guardar Edición',
+      scheduleBtn: 'Programar',
+      schedulingBtn: 'Sincronizando...',
       exportBtn: 'Exportar Contenido',
       exportMd: 'Markdown (.md)',
       exportJson: 'JSON (.json)',
-      exportTxt: 'Texto Plano (.txt)',
-      regenerateTitle: 'Regenerar solo esta variante',
-      syncSuccess: 'piezas agendadas en Calendar y guardadas en Supabase!',
-      syncError: 'Error al conectar con el flujo de agendamiento.',
+      exportTxt: 'Texto (.txt)',
+      discardBtn: 'Descartar',
+      saveBtn: 'Guardar',
+      modalTitle: 'Editor de Pieza Omnicanal',
+      inputTitleLabel: 'Título',
+      inputContentLabel: 'Contenido',
 
       tones: {
         viral: 'Directo & Viral',
@@ -174,10 +167,6 @@ export const useLanguage = () => {
         devs: 'Desarrolladores & Tech',
         execs: 'Ejecutivos B2B',
         general: 'Audiencia General'
-      },
-      languages: {
-        es: 'Español',
-        en: 'Inglés'
       },
       formats: {
         all: 'Todos',
@@ -196,7 +185,6 @@ export const useLanguage = () => {
       newslettersDesc: 'Estructuras informativas de alta conversión diseñadas para Substack y Beehiiv.',
       videosDesc: 'Guiones audiovisuales con marcas de tiempo para Shorts, Reels y TikTok.',
       audiosDesc: 'Estructuras de episodios de podcast diseñadas para maximizar la retención auditiva.',
-
       contactTitle: 'Soporte y Central de Webhooks',
       contactSubtitle: 'Envía una solicitud directa o prueba la integración de alertas (Discord, Telegram y Gmail).',
       formName: 'Tu Nombre',

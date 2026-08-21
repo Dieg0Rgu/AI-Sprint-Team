@@ -14,7 +14,6 @@
 ![OpenAI](https://img.shields.io/badge/OpenAI-gpt--5.6--luna-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-content__schedule-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Google Calendar](https://img.shields.io/badge/Google_Calendar-Scheduling-4285F4?style=for-the-badge&logo=googlecalendar&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)
 
 **OmniStudio AI** transforma una única premisa editorial en **5 piezas de contenido omnicanal** (Hilos, Artículos, Boletines, Videos y Audios) mediante un pipeline automatizado con **IA generativa**, permitiendo aprobar, editar y **programar la publicación** directamente en Supabase y Google Calendar.
 
